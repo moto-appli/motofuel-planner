@@ -1247,6 +1247,85 @@
       transform: translateY(0);
     }
 
+    /* Pin Placement Mode Banner on Map */
+    .pin-mode-banner {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    .pin-mode-banner.active {
+      display: flex;
+    }
+    .pin-mode-banner .btn-cancel-pin {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: #ffffff;
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .pin-mode-banner .btn-cancel-pin:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+    .input-mode-switch {
+      display: flex;
+      background: #e2e8f0;
+      padding: 2px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .input-mode-btn {
+      flex: 1;
+      border: none;
+      background: none;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #64748b;
+      padding: 5px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .input-mode-btn.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .btn-set-pin-direct {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      border-radius: 4px;
+      padding: 4px 7px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .btn-set-pin-direct:hover {
+      background: #dbeafe;
+    }
+
     /* Mobile Navigation Bar */
     .mobile-nav-bar {
       display: none;
@@ -1640,6 +1719,16 @@
           </div>
         </div>
 
+        <!-- Input Mode Switcher (Text Search vs Map Pin Drop) -->
+        <div class="input-mode-switch">
+          <button type="button" class="input-mode-btn active" id="btnModeText" onclick="setInputMode('text')">
+            <span>📝</span> 文字入力・地名検索
+          </button>
+          <button type="button" class="input-mode-btn" id="btnModePin" onclick="setInputMode('pin')">
+            <span>📍</span> 地図ピン直接指定 (キーボードなし)
+          </button>
+        </div>
+
         <!-- Round-trip Toggle Bar -->
         <div class="route-mode-bar">
           <label class="toggle-roundtrip">
@@ -1653,14 +1742,17 @@
         <div class="point-input-group">
           <!-- Start Point -->
           <div class="point-row">
-            <div class="point-dot start" onclick="focusAndPanTo('start')" title="クリックでこのピンに移動">発</div>
+            <div class="point-dot start" onclick="startPinDropFor('start')" title="クリックで地図からピン指定">発</div>
             <div class="input-wrapper">
               <input type="text" id="startInput" list="touringPlacesList" placeholder="出発地 (例: 東京駅、自宅、最寄りIC)" 
-                     onfocus="setActiveFocus('start')" onblur="handleInputBlur('start')"
+                     onfocus="onInputFocused('start')" onblur="handleInputBlur('start')"
                      onkeydown="handleInputKeydown(event, 'start')" oninput="onInputEdited('start')" />
               <span id="badge_start" class="input-status-badge empty">未設定</span>
               <button class="btn-search-loc" onclick="searchGeocode('start', null, true)" title="検索・地図反映">🔍</button>
             </div>
+            <button class="btn-set-pin-direct" onclick="startPinDropFor('start')" title="キーボードを開かずに地図タップで場所を指定">
+              <span>📍</span>
+            </button>
             <button class="btn-del-point" onclick="clearPoint('start')" title="出発地をクリア">✖</button>
           </div>
 
@@ -1681,15 +1773,34 @@
 
           <!-- Destination / Turnaround Point -->
           <div class="point-row" style="margin-top: 2px;">
-            <div id="destDot" class="point-dot end" onclick="focusAndPanTo('end')" title="クリックでこのピンに移動">折</div>
+            <div id="destDot" class="point-dot end" onclick="startPinDropFor('end')" title="クリックで地図からピン指定">折</div>
             <div class="input-wrapper">
               <input type="text" id="endInput" list="touringPlacesList" placeholder="目的地・折り返し (例: 志賀高原、伊豆、富士山)" 
-                     onfocus="setActiveFocus('end')" onblur="handleInputBlur('end')"
+                     onfocus="onInputFocused('end')" onblur="handleInputBlur('end')"
                      onkeydown="handleInputKeydown(event, 'end')" oninput="onInputEdited('end')" />
               <span id="badge_end" class="input-status-badge empty">未設定</span>
               <button class="btn-search-loc" onclick="searchGeocode('end', null, true)" title="検索・地図反映">🔍</button>
             </div>
+            <button class="btn-set-pin-direct" onclick="startPinDropFor('end')" title="キーボードを開かずに地図タップで場所を指定">
+              <span>📍</span>
+            </button>
             <button class="btn-del-point" onclick="clearPoint('end')" title="目的地をクリア">✖</button>
+          </div>
+        </div>
+
+        <!-- Highway & Toll Road Toggle -->
+        <div style="margin-top: 10px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label for="selectHighwayMode" style="font-size: 0.72rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 4px;">
+              <span>🛣️</span> 高速・有料道路
+            </label>
+            <select id="selectHighwayMode" class="filter-select" onchange="onHighwayModeChange()" style="font-size: 0.76rem; padding: 3px 8px;">
+              <option value="allow">高速・有料道路を利用 (標準)</option>
+              <option value="avoid">下道優先 (高速・有料道路を使わない)</option>
+            </select>
+          </div>
+          <div style="font-size: 0.65rem; color: var(--gray-600); margin-top: 3px; line-height: 1.3;">
+            ※「下道優先」にするとGoogleマップも自動的に有料道路回避でナビ開始します（原付二種・ツーリング向け）
           </div>
         </div>
 
@@ -1944,6 +2055,15 @@
 
   <!-- Map Container -->
   <main id="map">
+    <!-- Pin Drop Guidance Banner on Map -->
+    <div id="pinModeBanner" class="pin-mode-banner">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:1.1rem;">📍</span>
+        <span id="pinModeBannerText">地図上をタップして場所を指定してください</span>
+      </div>
+      <button type="button" class="btn-cancel-pin" onclick="cancelPinDropMode()">✕ 終了</button>
+    </div>
+
     <div class="map-overlay-tip">
       <span>👆</span>
       <span id="mapTipText">ピンをドラッグして位置微調整、または地図クリックで設定できます</span>
@@ -2391,6 +2511,7 @@
         timeVal: document.getElementById('timeInput').value,
         breakTime: document.getElementById('checkBreakTime').checked,
         bikePreset: document.getElementById('bikePresetSelect')?.value || 'custom',
+        highwayMode: document.getElementById('selectHighwayMode')?.value || 'allow',
         filterGsBrand: document.getElementById('filterGsBrand')?.value || 'all',
         filterGsService: document.getElementById('filterGsService')?.value || 'all',
         totalDistKm: totalDist,
@@ -2434,6 +2555,10 @@
       if (typeof r.breakTime === 'boolean') document.getElementById('checkBreakTime').checked = r.breakTime;
       if (r.filterGsBrand && document.getElementById('filterGsBrand')) document.getElementById('filterGsBrand').value = r.filterGsBrand;
       if (r.filterGsService && document.getElementById('filterGsService')) document.getElementById('filterGsService').value = r.filterGsService;
+      if (r.highwayMode && document.getElementById('selectHighwayMode')) {
+        document.getElementById('selectHighwayMode').value = r.highwayMode;
+        highwayAvoidMode = r.highwayMode;
+      }
 
       // Restore Points
       setStartPoint(r.startPoint.lat, r.startPoint.lng, r.startPoint.name);
@@ -2460,8 +2585,74 @@
     }
 
     // ==========================================
-    // Focus & Input Management
+    // Focus, Pin Drop & Highway Mode Management
     // ==========================================
+    let currentInputMode = 'text'; // 'text' | 'pin'
+    let highwayAvoidMode = 'allow'; // 'allow' | 'avoid'
+
+    function setInputMode(mode) {
+      currentInputMode = mode;
+      document.getElementById('btnModeText')?.classList.toggle('active', mode === 'text');
+      document.getElementById('btnModePin')?.classList.toggle('active', mode === 'pin');
+
+      if (mode === 'pin') {
+        showToast("📍 地図ピン設置モード: 各行の「📍」や丸印を押すとキーボードなしで直接指定できます");
+      } else {
+        showToast("📝 文字入力モード: キーボードで地名や住所を検索できます");
+      }
+    }
+
+    function onInputFocused(target) {
+      if (currentInputMode === 'pin') {
+        const input = getInputElement(target);
+        if (input) input.blur();
+        startPinDropFor(target);
+      } else {
+        setActiveFocus(target);
+      }
+    }
+
+    function startPinDropFor(target) {
+      activeFocusTarget = target;
+      let targetLabel = "場所";
+      if (target === 'start') targetLabel = "【出発地】";
+      else if (target === 'end') targetLabel = isRoundTrip ? "【折り返し地点】" : "【目的地】";
+      else if (target && target.startsWith('via_')) {
+        const id = parseInt(target.replace('via_', ''), 10);
+        const idx = viaPoints.findIndex(v => v.id === id);
+        targetLabel = `【経由地 ${idx + 1}】`;
+      }
+
+      const banner = document.getElementById('pinModeBanner');
+      const text = document.getElementById('pinModeBannerText');
+      if (banner && text) {
+        text.textContent = `📍 ${targetLabel} の場所を地図上でタップしてください`;
+        banner.classList.add('active');
+      }
+
+      if (window.innerWidth <= 820) {
+        switchMobileTab('map');
+      }
+    }
+
+    function cancelPinDropMode() {
+      activeFocusTarget = null;
+      document.getElementById('pinModeBanner')?.classList.remove('active');
+      document.getElementById('focusTipBar')?.style.setProperty('display', 'none');
+      showToast("ピン設置モードを解除しました");
+    }
+
+    function onHighwayModeChange() {
+      const sel = document.getElementById('selectHighwayMode');
+      highwayAvoidMode = sel ? sel.value : 'allow';
+
+      if (currentRouteData) {
+        calculateRouteAndFuelPlan();
+      } else {
+        showToast(highwayAvoidMode === 'avoid' ? "🛣️ 下道優先（有料道路なし）に設定しました" : "🛣️ 高速・有料道路を利用に設定しました");
+      }
+    }
+
     function setActiveFocus(target) {
       activeFocusTarget = target;
       document.querySelectorAll('.input-wrapper input').forEach(el => el.classList.remove('active-focus'));
@@ -2522,6 +2713,9 @@
       const coordName = `地点 (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
 
       clearRouteVisualsOnly();
+
+      // ガイダンスバナーを非表示
+      document.getElementById('pinModeBanner')?.classList.remove('active');
 
       if (activeFocusTarget === 'start') {
         setStartPoint(lat, lng, coordName);
@@ -2724,14 +2918,17 @@
         const num = index + 1;
 
         row.innerHTML = `
-          <div class="point-dot via" onclick="focusAndPanTo('via_${via.id}')" title="クリックでこのピンに移動">経${num}</div>
+          <div class="point-dot via" onclick="startPinDropFor('via_${via.id}')" title="クリックで地図からピン指定">経${num}</div>
           <div class="input-wrapper">
             <input type="text" id="viaInput_${via.id}" list="touringPlacesList" value="${via.name || ''}" placeholder="経由地 ${num} (例: 諏訪湖、白樺湖、道の駅)" 
-                   onfocus="setActiveFocus('via_${via.id}')" onblur="handleInputBlur('via_${via.id}')"
+                   onfocus="onInputFocused('via_${via.id}')" onblur="handleInputBlur('via_${via.id}')"
                    onkeydown="handleInputKeydown(event, 'via', ${via.id})" oninput="onInputEdited('via', ${via.id})" />
-            <span id="badge_via_${via.id}" class="input-status-badge ${via.lat ? 'ok' : 'pending'}">${via.lat ? '✓ 確定' : '未検索'}</span>
+            <span id="badge_via_${via.id}" class="input-status-badge ${via.lat ? 'ok' : 'pending'}">${via.lat ? '✓ 確定' : 'Enterで確定 ⏎'}</span>
             <button class="btn-search-loc" onclick="searchGeocode('via', ${via.id}, true)" title="検索・地図反映">🔍</button>
           </div>
+          <button class="btn-set-pin-direct" onclick="startPinDropFor('via_${via.id}')" title="キーボードを開かずに地図タップで場所を指定">
+            <span>📍</span>
+          </button>
           <div class="via-controls-wrap">
             <button class="btn-move-via" onclick="moveViaPoint(${index}, -1)" ${isFirst ? 'disabled' : ''} title="順序を上に移動">▲</button>
             <button class="btn-move-via" onclick="moveViaPoint(${index}, 1)" ${isLast ? 'disabled' : ''} title="順序を下に移動">▼</button>
@@ -3906,7 +4103,11 @@
       function buildLegUrl(origin, waypoints, destination) {
         const allStops = [origin, ...waypoints, destination];
         const path = allStops.map(s => `${s.lat},${s.lng}`).join('/');
-        return `https://www.google.com/maps/dir/${path}/`;
+        let url = `https://www.google.com/maps/dir/${path}/`;
+        if (highwayAvoidMode === 'avoid') {
+          url += '?avoid=highways,tolls';
+        }
+        return url;
       }
 
       const pinLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
