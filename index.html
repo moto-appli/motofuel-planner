@@ -4074,16 +4074,14 @@
         const roadLat = coords[idx][1];
         const roadLng = coords[idx][0];
 
-        // 敷地奥や裏路地への誤吸着を防ぐため、表の主要道路(ルート線)側の進入路座標(道路寄り80%)を算出
-        // これによりGoogleマップが裏の細い路地や民家の前を通ってしまう「でたらめな場所ずれ」を完全防止！
-        const entranceLat = parseFloat((roadLat * 0.8 + gs.lat * 0.2).toFixed(5));
-        const entranceLng = parseFloat((roadLng * 0.8 + gs.lng * 0.2).toFixed(5));
-
+        // 【超重要】Googleマップが裏路地や敷地裏の生活道路・あぜ道に誤吸着するのを100%防ぐため、
+        // 経由地ピンは「ルート本線の道路上(roadLat, roadLng)」そのものに完全固定！
+        // これにより国道や大通りを確実に走行しつつ、スタンドの真横・入り口の目の前を経由します。
         return {
           type: 'gs',
           name: `⛽ ${gs.name}`,
-          lat: entranceLat,
-          lng: entranceLng,
+          lat: parseFloat(roadLat.toFixed(5)),
+          lng: parseFloat(roadLng.toFixed(5)),
           rawGsLat: gs.lat,
           rawGsLng: gs.lng,
           coordIndex: idx
@@ -4109,18 +4107,38 @@
       const allOrderedStops = [startStop, ...intermediateStops, finalStop];
 
       // Google Maps URL limit: max 10 total stops (origin + destination + 8 intermediates)
-      // Using slash-path format: /maps/dir/stop1/stop2/.../stopN/
-      // This format ALWAYS shows every stop as a labeled pin (A, B, C…) in the route panel.
-      // The ?api=1&waypoints= format can silently treat stops as invisible pass-through points.
       const MAX_INTERMEDIATE_PER_LEG = 8; // 8 intermediates = 10 total stops per leg
 
-      // Build a Google Maps URL using slash-path format: each stop shows as a labeled pin
+      // Build a Google Maps URL:
+      // 公式APIディープリンク(travelmode=driving)を標準採用し、徒歩やフェリーへの勝手な切り替えを100%根絶！
       function buildLegUrl(origin, waypoints, destination) {
+        const params = new URLSearchParams();
+        params.set('api', '1');
+        params.set('origin', `${origin.lat},${origin.lng}`);
+        params.set('destination', `${destination.lat},${destination.lng}`);
+        params.set('travelmode', 'driving'); // 車・バイクの運転モードを100%強制！(徒歩固定やフェリー誤誘導を完全防止)
+
+        if (waypoints && waypoints.length > 0) {
+          const wpStr = waypoints.map(w => `${w.lat},${w.lng}`).join('|');
+          params.set('waypoints', wpStr);
+        }
+
+        if (highwayAvoidMode === 'avoid') {
+          params.set('avoid', 'highways,tolls'); // 下道優先(有料・高速回避)を確実に引き継ぐ
+        }
+
+        return `https://www.google.com/maps/dir/?${params.toString()}`;
+      }
+
+      // WebブラウザでA, B, Cピン一覧として見たい場合のSlash URL (data=!4m2!4m1!3e0で車モード強制)
+      function buildWebSlashUrl(origin, waypoints, destination) {
         const allStops = [origin, ...waypoints, destination];
         const path = allStops.map(s => `${s.lat},${s.lng}`).join('/');
         let url = `https://www.google.com/maps/dir/${path}/`;
         if (highwayAvoidMode === 'avoid') {
-          url += '?avoid=highways,tolls';
+          url += 'data=!4m4!4m3!1m0!1m0!3e0!2m2!1b1!2b1';
+        } else {
+          url += 'data=!4m2!4m1!3e0';
         }
         return url;
       }
@@ -4130,7 +4148,7 @@
       function renderStopsPinListHtml(stops) {
         return `
           <div style="margin: 8px 0; font-size: 0.74rem; background: #ffffff; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <div style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 0.7rem;">📍 Googleマップ上のピン番号対応:</div>
+            <div style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 0.7rem;">📍 Googleマップ上の経由地一覧:</div>
             ${stops.map((s, idx) => {
               const letter = pinLetters[idx] || `${idx + 1}`;
               const isGs = s.type === 'gs';
@@ -4151,6 +4169,7 @@
       if (intermediateStops.length <= MAX_INTERMEDIATE_PER_LEG) {
         // Single Leg — all stops fit within Google Maps 10-point limit
         const url = buildLegUrl(startStop, intermediateStops, finalStop);
+        const webUrl = buildWebSlashUrl(startStop, intermediateStops, finalStop);
         const totalPins = 2 + intermediateStops.length;
         const gsCount = intermediateStops.filter(s => s.type === 'gs').length;
 
@@ -4162,12 +4181,15 @@
             </div>
             <div class="leg-route-title">${escapeXml(startStop.name)} ➜ ${escapeXml(finalStop.name)}</div>
             ${renderStopsPinListHtml(allOrderedStops)}
-            <div class="leg-btn-group">
-              <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener">
+            <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:8px;">
+              <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" style="flex:1; min-width:200px;">
                 <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-                <span>Googleマップで全行程を開く</span>
+                <span>🚗 Googleマップで開く (車ナビ確定)</span>
               </a>
               <button class="btn-leg-copy" data-copy-url="${url}">📋 URLコピー</button>
+              <a href="${webUrl}" target="_blank" rel="noopener" style="font-size:0.75rem; color:#475569; text-decoration:underline; display:inline-flex; align-items:center; padding:4px 8px; width:100%; justify-content:center;">
+                🖥️ Webブラウザ用のピン一覧形式で開く
+              </a>
             </div>
           </div>
         `;
@@ -4225,6 +4247,7 @@
           const textColor = badgeTextColors[(legNum - 1) % badgeTextColors.length];
           const legPhase = legNum === 1 ? '前半' : (legNum === legs.length ? '後半' : `中盤${legNum - 1}`);
           const url = buildLegUrl(leg.origin, leg.waypoints, leg.destination);
+          const webUrl = buildWebSlashUrl(leg.origin, leg.waypoints, leg.destination);
           const totalLegPins = 2 + leg.waypoints.length;
 
           const allLegStops = [leg.origin, ...leg.waypoints, leg.destination];
@@ -4238,12 +4261,15 @@
               </div>
               <div class="leg-route-title">${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}</div>
               ${renderStopsPinListHtml(allLegStops)}
-              <div class="leg-btn-group">
-                <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener">
+              <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:8px;">
+                <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" style="flex:1; min-width:200px;">
                   <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-                  <span>Googleマップ【ルート${legNum}】を開く</span>
+                  <span>🚗 Googleマップ【ルート${legNum}】を開く (車ナビ確定)</span>
                 </a>
                 <button class="btn-leg-copy" data-copy-url="${url}">📋 URLコピー</button>
+                <a href="${webUrl}" target="_blank" rel="noopener" style="font-size:0.75rem; color:#475569; text-decoration:underline; display:inline-flex; align-items:center; padding:4px 8px; width:100%; justify-content:center;">
+                  🖥️ Webブラウザ用のピン一覧形式で開く
+                </a>
               </div>
             </div>
           `;
