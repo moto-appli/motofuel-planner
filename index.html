@@ -1,0 +1,4216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>MotoFuel Planner - バイクツーリング給油計画＆ルート作成</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MotoFuel">
+  <meta name="theme-color" content="#111827">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <style>
+    :root {
+      --primary: #ff6b00;
+      --primary-dark: #e05300;
+      --primary-light: #fff3eb;
+      --secondary: #1a73e8;
+      --secondary-dark: #1557b0;
+      --success: #1e8e3e;
+      --warning: #f9ab00;
+      --danger: #d93025;
+      --gray-50: #f8f9fa;
+      --gray-100: #f1f3f4;
+      --gray-200: #e8eaed;
+      --gray-300: #dadce0;
+      --gray-600: #5f6368;
+      --gray-800: #202124;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.16);
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      color: var(--gray-800);
+      background: var(--gray-50);
+    }
+
+    /* Sidebar Layout */
+    #sidebar {
+      width: 440px;
+      min-width: 370px;
+      height: 100%;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 16px rgba(0,0,0,0.08);
+      z-index: 1000;
+      position: relative;
+    }
+
+    .sidebar-header {
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #1f2937, #111827);
+      color: #ffffff;
+      border-bottom: 2px solid var(--primary);
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: rgba(255, 107, 0, 0.15);
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-header h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: -0.3px;
+    }
+
+    .btn-header-reset {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #e5e7eb;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    .btn-header-reset:hover {
+      background: rgba(239, 68, 68, 0.3);
+      border-color: #ef4444;
+      color: #ffffff;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Cards */
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius);
+      padding: 12px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+
+    .card-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--gray-800);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title .icon-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Saved My Routes Styles */
+    .btn-save-sm {
+      background: #f1f5f9;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .btn-save-sm:hover {
+      background: #eff6ff;
+      border-color: var(--secondary);
+    }
+
+    .saved-routes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .saved-route-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.15s;
+    }
+    .saved-route-item:hover {
+      background: #f0fdf4;
+      border-color: #86efac;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+
+    .saved-route-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+
+    .saved-route-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 290px;
+    }
+
+    .saved-route-meta {
+      font-size: 0.68rem;
+      color: #64748b;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .saved-route-tag {
+      background: #e2e8f0;
+      color: #334155;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .btn-del-saved {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .btn-del-saved:hover {
+      color: var(--danger);
+      background: #fee2e2;
+    }
+
+    .saved-empty-tip {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      text-align: center;
+      padding: 12px 6px;
+      line-height: 1.4;
+      background: #f8fafc;
+      border-radius: 6px;
+      border: 1px dashed #cbd5e1;
+    }
+
+    /* Round Trip & Mode Toolbar */
+    .route-mode-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f1f5f9;
+      padding: 6px 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .toggle-roundtrip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-roundtrip input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .badge-roundtrip {
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #475569;
+      font-weight: bold;
+    }
+    .badge-roundtrip.active {
+      background: #ffedd5;
+      color: #c2410c;
+    }
+
+    /* Input Fields for Waypoints */
+    .point-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .point-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+
+    .point-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .point-dot.start { background: var(--success); }
+    .point-dot.end { background: var(--danger); }
+    .point-dot.via { background: var(--warning); color: #78350f; }
+
+    .input-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 7px 58px 7px 10px;
+      font-size: 0.82rem;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      background: var(--gray-50);
+      transition: all 0.15s;
+    }
+
+    .input-wrapper input.active-focus {
+      border-color: var(--secondary) !important;
+      background: #ffffff !important;
+      box-shadow: 0 0 0 2px rgba(26,115,232,0.2) !important;
+    }
+
+    .input-wrapper input.error {
+      border-color: var(--danger) !important;
+      background: #fef2f2 !important;
+    }
+
+    .input-status-badge {
+      position: absolute;
+      right: 28px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    .input-status-badge.ok {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .input-status-badge.pending {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .input-status-badge.error {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .btn-search-loc {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--gray-600);
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .btn-search-loc:hover {
+      color: var(--secondary);
+      background: #e2e8f0;
+    }
+
+    .btn-del-point {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #94a3b8;
+      font-size: 13px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+    }
+
+    .btn-del-point:hover {
+      color: var(--danger);
+      background: #fee2e2;
+    }
+
+    .via-controls-wrap {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .btn-move-via {
+      background: none;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+      font-size: 10px;
+      padding: 3px 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      transition: all 0.15s;
+    }
+
+    .btn-move-via:hover:not(:disabled) {
+      color: var(--secondary);
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+
+    .btn-move-via:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+      border-color: transparent;
+    }
+
+    .via-actions-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 3px;
+    }
+
+    .btn-add-via {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      background: #ffffff;
+      border: 1px dashed var(--gray-300);
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-add-via:hover {
+      border-color: var(--secondary);
+      background: #eff6ff;
+    }
+
+    .btn-clear-vias {
+      background: none;
+      border: none;
+      font-size: 0.7rem;
+      color: #64748b;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .btn-clear-vias:hover {
+      color: var(--danger);
+    }
+
+    /* Active Focus Helper Notice */
+    .focus-tip-bar {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      color: #1e40af;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 4px;
+    }
+
+    /* Time Settings Card */
+    .time-settings-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .time-mode-selector {
+      display: flex;
+      gap: 12px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .time-mode-selector label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .time-inputs-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .time-picker-wrap {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      padding: 4px 8px;
+      background: #ffffff;
+      flex: 1;
+    }
+
+    .time-picker-wrap input[type="time"] {
+      border: none;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--gray-800);
+      background: transparent;
+      outline: none;
+      width: 100%;
+    }
+
+    .break-time-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--gray-600);
+      margin-top: 2px;
+    }
+
+    /* Motorcycle Specs */
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .spec-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--gray-600);
+    }
+
+    .spec-input-wrap {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      background: #ffffff;
+      padding: 0 8px;
+    }
+
+    .spec-input-wrap input {
+      width: 100%;
+      border: none;
+      padding: 5px 0;
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--gray-800);
+      text-align: right;
+    }
+
+    .spec-input-wrap input:focus {
+      outline: none;
+    }
+
+    .spec-unit {
+      font-size: 0.72rem;
+      color: var(--gray-600);
+      margin-left: 4px;
+      font-weight: 500;
+    }
+
+    /* Slider Row */
+    .slider-box {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--gray-300);
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .slider-val-badge {
+      font-size: 0.76rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      background: var(--primary-light);
+      padding: 2px 7px;
+      border-radius: 12px;
+    }
+
+    input[type=range] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--gray-300);
+      outline: none;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .fuel-calc-summary {
+      margin-top: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+    }
+
+    .calc-stat-item .val {
+      font-size: 0.98rem;
+      font-weight: 800;
+      color: var(--gray-800);
+    }
+
+    .calc-stat-item .lbl {
+      font-size: 0.65rem;
+      color: var(--gray-600);
+    }
+
+    .calc-stat-item.highlight .val {
+      color: var(--primary);
+    }
+
+    /* Action Buttons */
+    .btn-primary {
+      width: 100%;
+      padding: 11px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 2px 6px rgba(255,107,0,0.3);
+      transition: background 0.15s, transform 0.05s;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.99);
+    }
+
+    /* Route Stats Banner */
+    .route-banner {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .route-banner-item .val {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #065f46;
+    }
+
+    .route-banner-item .lbl {
+      font-size: 0.65rem;
+      color: #047857;
+    }
+
+    .schedule-bar {
+      margin-top: 6px;
+      background: #f0fdf4;
+      border-radius: 6px;
+      padding: 5px 8px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #166534;
+      border: 1px dashed #bbf7d0;
+    }
+
+    .btn-save-current-route {
+      width: 100%;
+      margin-top: 8px;
+      padding: 7px;
+      background: #ffffff;
+      border: 1px solid #10b981;
+      color: #047857;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .btn-save-current-route:hover {
+      background: #ecfdf5;
+    }
+
+    /* Timeline Section */
+    .plan-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .plan-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      padding-left: 14px;
+    }
+
+    .plan-timeline::before {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 10px;
+      bottom: 10px;
+      width: 2px;
+      background: var(--gray-300);
+    }
+
+    .plan-node {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .plan-node::before {
+      content: "";
+      position: absolute;
+      left: -14px;
+      top: 6px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 2px var(--primary);
+    }
+
+    .plan-node.destination::before {
+      background: var(--danger);
+      box-shadow: 0 0 0 2px var(--danger);
+    }
+
+    .plan-card {
+      background: #ffffff;
+      border: 1px solid var(--gray-300);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.76rem;
+    }
+
+    .plan-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+    }
+
+    .plan-title {
+      font-weight: 700;
+      color: var(--gray-800);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .plan-eta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #1e40af;
+      background: #dbeafe;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .plan-gs-name {
+      font-weight: 600;
+      color: var(--secondary);
+      margin-top: 2px;
+    }
+
+    .plan-gs-detail {
+      color: var(--gray-600);
+      font-size: 0.7rem;
+      margin-top: 3px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .open-status-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .open-status-badge.open {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .open-status-badge.closed {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .open-status-badge.all-night {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+
+    /* Export Box */
+    .export-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-gmaps {
+      background: #1a73e8;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 2px 6px rgba(26,115,232,0.3);
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .btn-gmaps:hover {
+      background: #1557b0;
+    }
+
+    .btn-gmaps svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    .export-secondary-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-gpx, .btn-copy-url {
+      flex: 1;
+      padding: 6px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      background: #ffffff;
+      border: 1px solid #93c5fd;
+      color: #1e40af;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .btn-gpx:hover, .btn-copy-url:hover {
+      background: #dbeafe;
+    }
+
+    /* Gas Station Filter Controls */
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .filter-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #334155;
+    }
+    .filter-select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 0.76rem;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1e293b;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--secondary);
+      box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+    }
+
+    /* Multi-leg Google Maps UI */
+    .multi-leg-notice {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-size: 0.72rem;
+      color: #92400e;
+      line-height: 1.4;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .multi-leg-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .leg-card {
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .leg-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .leg-badge {
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #1e40af;
+      color: #ffffff;
+    }
+    .leg-badge.leg-2 {
+      background: #047857;
+    }
+    .leg-badge.leg-3 {
+      background: #b45309;
+    }
+    .leg-stop-count {
+      font-size: 0.68rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .leg-route-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .leg-stops-preview {
+      font-size: 0.68rem;
+      color: #64748b;
+      background: #f8fafc;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+      line-height: 1.35;
+    }
+    .leg-btn-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .btn-leg-gmaps {
+      flex: 2;
+      background: #1a73e8;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      text-decoration: none;
+      box-shadow: 0 1px 4px rgba(26,115,232,0.25);
+      transition: background 0.15s;
+    }
+    .btn-leg-gmaps:hover {
+      background: #1557b0;
+    }
+    .btn-leg-gmaps svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    .btn-leg-copy {
+      flex: 1;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      border-radius: 6px;
+      padding: 8px 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+    .btn-leg-copy:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    /* Map */
+    #map {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    .map-overlay-tip {
+      position: absolute;
+      top: 14px;
+      left: 60px;
+      z-index: 999;
+      background: rgba(31, 41, 55, 0.92);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.74rem;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(4px);
+    }
+
+    .map-loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1001;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 16px 24px;
+      box-shadow: var(--shadow-lg);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--gray-800);
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--gray-300);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Custom Leaflet Markers (All Draggable with Shadow) */
+    .custom-div-icon {
+      background: none;
+      border: none;
+    }
+
+    .custom-pin {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 11px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+      cursor: grab;
+      transition: transform 0.1s;
+    }
+    .custom-pin:active {
+      cursor: grabbing;
+      transform: scale(1.15);
+    }
+    .custom-pin.start { background: #16a34a; }
+    .custom-pin.end { background: #dc2626; }
+    .custom-pin.via { background: #d97706; }
+
+    .gs-marker-pin {
+      width: 32px;
+      height: 32px;
+      background: #ff6b00;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 15px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .gs-marker-pin.closed {
+      background: #64748b;
+      opacity: 0.7;
+    }
+
+    .gs-marker-pin:hover {
+      transform: scale(1.18);
+    }
+
+    .milestone-marker-pin {
+      width: 26px;
+      height: 26px;
+      background: #d93025;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Toast Notification */
+    .toast-msg {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(17, 24, 39, 0.95);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s ease;
+      pointer-events: none;
+    }
+    .toast-msg.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Mobile Navigation Bar */
+    .mobile-nav-bar {
+      display: none;
+    }
+    .mobile-map-calc-btn {
+      display: none;
+    }
+
+    /* GPS Locate Floating Button on Map */
+    .btn-gps-locate {
+      position: absolute;
+      top: 80px;
+      right: 12px;
+      z-index: 900;
+      background: #ffffff;
+      border: 2px solid rgba(0,0,0,0.15);
+      border-radius: 8px;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+      transition: all 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-gps-locate:active {
+      background: #e2e8f0;
+      transform: scale(0.95);
+    }
+
+    @media (max-width: 820px) {
+      body {
+        flex-direction: column;
+        height: 100vh;
+        height: 100dvh;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* iOS Safari Auto-Zoom Prevention */
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+
+      /* Touch Target Improvements */
+      .btn-search-loc, .btn-del-point, .btn-move-via {
+        min-width: 36px;
+        min-height: 36px;
+      }
+      .btn-primary {
+        padding: 13px 18px;
+        font-size: 0.95rem;
+        touch-action: manipulation;
+      }
+
+      /* Map and Sidebar Containers in Mobile Mode */
+      #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 58px;
+        height: auto;
+        flex: none;
+        z-index: 1;
+      }
+
+      #sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 58px;
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        z-index: 2;
+        background: #ffffff;
+        box-shadow: none;
+        display: none;
+      }
+
+      /* Controlled by active mobile tab */
+      body.mobile-tab-settings #sidebar,
+      body.mobile-tab-plan #sidebar {
+        display: flex;
+      }
+      body.mobile-tab-map #sidebar {
+        display: none;
+      }
+
+      /* In Plan tab: focus view on Route Summary, Timeline, and Google Maps Export */
+      body.mobile-tab-plan #savedRoutesCard,
+      body.mobile-tab-plan #cardRouteSettings,
+      body.mobile-tab-plan #cardTimeSettings,
+      body.mobile-tab-plan #cardBikeSpecs,
+      body.mobile-tab-plan #cardGsFilter,
+      body.mobile-tab-plan #btnMainCalculate {
+        display: none !important;
+      }
+
+      .sidebar-header {
+        padding: 8px 12px;
+      }
+      .sidebar-content {
+        padding: 10px 12px;
+        gap: 10px;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Floating Calculate Button on Map Fullscreen */
+      body.mobile-tab-map .mobile-map-calc-btn {
+        display: flex;
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        background: linear-gradient(135deg, #ff6b00, #ea580c);
+        color: #ffffff;
+        border: none;
+        padding: 11px 22px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        font-weight: 800;
+        box-shadow: 0 4px 16px rgba(255, 107, 0, 0.45);
+        cursor: pointer;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        touch-action: manipulation;
+      }
+
+      /* Mobile Bottom Navigation Bar */
+      .mobile-nav-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 58px;
+        background: #111827;
+        border-top: 1px solid #374151;
+        display: flex;
+        z-index: 2000;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+
+      .mobile-tab-btn {
+        flex: 1;
+        background: none;
+        border: none;
+        color: #9ca3af;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 4px 0;
+        transition: all 0.15s;
+        touch-action: manipulation;
+        position: relative;
+      }
+
+      .mobile-tab-btn .tab-icon {
+        font-size: 1.15rem;
+      }
+
+      .mobile-tab-btn.active {
+        color: var(--primary);
+        background: rgba(255, 107, 0, 0.08);
+      }
+
+      .mobile-tab-btn.active::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 20%;
+        right: 20%;
+        height: 3px;
+        background: var(--primary);
+        border-radius: 0 0 3px 3px;
+      }
+
+      .mobile-tab-badge {
+        position: absolute;
+        top: 4px;
+        right: calc(50% - 20px);
+        background: var(--primary);
+        color: #ffffff;
+        font-size: 0.6rem;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 999px;
+        display: none;
+      }
+
+      .modal-box {
+        max-height: 90vh;
+        border-radius: 16px 16px 0 0;
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        padding-bottom: env(safe-area-inset-bottom, 10px);
+      }
+      .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+      }
+    }
+    /* Gas Station Selection Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      backdrop-filter: blur(2px);
+    }
+    .modal-box {
+      background: #ffffff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      padding: 12px 16px;
+      background: #1e293b;
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 2px 6px;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    .modal-close-btn:hover {
+      color: #ffffff;
+      background: rgba(255,255,255,0.15);
+    }
+    .modal-body {
+      padding: 14px 16px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .gs-cand-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .gs-cand-item:hover {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+    .gs-cand-item.selected {
+      border-color: #ff6b00;
+      background: #fff7ed;
+    }
+    .btn-edit-gs {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #1a73e8;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+    .btn-edit-gs:hover {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Datalist for Quick Autocomplete Suggestions -->
+  <datalist id="touringPlacesList">
+    <option value="東京駅">東京都千代田区</option>
+    <option value="新宿駅">東京都新宿区</option>
+    <option value="渋谷駅">東京都渋谷区</option>
+    <option value="横浜駅">神奈川県横浜市</option>
+    <option value="名古屋駅">愛知県名古屋市</option>
+    <option value="京都駅">京都府京都市</option>
+    <option value="大阪駅">大阪府大阪市</option>
+    <option value="ビーナスライン (美ヶ原高原)">長野県上田市</option>
+    <option value="霧ヶ峰 (富士見台)">長野県諏訪市</option>
+    <option value="白樺湖">長野県茅野市</option>
+    <option value="諏訪湖 SA (中央道)">長野県諏訪市</option>
+    <option value="箱根湯本">神奈川県箱根町</option>
+    <option value="大観山展望台 (スカイラウンジ)">神奈川県湯河原町</option>
+    <option value="伊豆スカイライン (亀石峠)">静岡県伊豆の国市</option>
+    <option value="道の駅 開国下田みなと">静岡県下田市</option>
+    <option value="富士山五合目 (スバルライン)">山梨県富士吉田市</option>
+    <option value="山中湖パノラマ台">山梨県山中湖村</option>
+    <option value="本栖湖">山梨県身延町</option>
+    <option value="道の駅 どうし (道志みち)">山梨県道志村</option>
+    <option value="奥多摩湖 (大麦代駐車場)">東京都奥多摩町</option>
+    <option value="草津温泉">群馬県草津町</option>
+    <option value="渋峠 (日本国道最高地点)">群馬・長野県境</option>
+    <option value="日光東照宮">栃木県日光市</option>
+    <option value="中禅寺湖">栃木県日光市</option>
+    <option value="マキノ高原メタセコイア並木">滋賀県高島市</option>
+    <option value="奥琵琶湖パークウェイ">滋賀県長浜市</option>
+    <option value="針テラス (道の駅 針T・R・S)">奈良県奈良市</option>
+    <option value="青山高原">三重県伊賀市</option>
+    <option value="潮岬 (本州最南端)">和歌山県串本町</option>
+    <option value="阿蘇大観峰">熊本県阿蘇市</option>
+  </datalist>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div>
+        <div class="header-badge">🏍️ Touring Fuel & Route Planner</div>
+        <h1>MotoFuel Planner</h1>
+      </div>
+      <button class="btn-header-reset" onclick="resetAllPointsAndRoute()" title="ピンと入力をすべてクリア">
+        <span>🗑️</span> 全クリア
+      </button>
+    </div>
+
+    <div class="sidebar-content">
+
+      <!-- Saved My Routes Card (Replaces fixed presets) -->
+      <div class="card" id="savedRoutesCard">
+        <div class="card-title">
+          <div class="icon-wrap">
+            <span>📁</span>
+            <span>保存したマイルート</span>
+          </div>
+          <button class="btn-save-sm" onclick="saveCurrentRoute()" title="現在のルートを保存">
+            <span>💾</span> 現在のルートを保存
+          </button>
+        </div>
+        <div id="savedRoutesList" class="saved-routes-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Route Planner Card -->
+      <div class="card" id="cardRouteSettings">
+        <div class="card-title">
+          <div class="icon-wrap">
+            <span>🗺️</span>
+            <span>ツーリングルート設定</span>
+          </div>
+        </div>
+
+        <!-- Round-trip Toggle Bar -->
+        <div class="route-mode-bar">
+          <label class="toggle-roundtrip">
+            <input type="checkbox" id="checkRoundTrip" onchange="onRoundTripToggle()" checked />
+            <span>🔄 往復ルートにする (発着同地点)</span>
+          </label>
+          <span id="badgeRoundTrip" class="badge-roundtrip active">往復モード</span>
+        </div>
+
+        <!-- Waypoint Input Group -->
+        <div class="point-input-group">
+          <!-- Start Point -->
+          <div class="point-row">
+            <div class="point-dot start" onclick="focusAndPanTo('start')" title="クリックでこのピンに移動">発</div>
+            <div class="input-wrapper">
+              <input type="text" id="startInput" list="touringPlacesList" placeholder="出発地 (例: 東京駅、自宅、最寄りIC)" 
+                     onfocus="setActiveFocus('start')" onblur="handleInputBlur('start')"
+                     onkeydown="handleInputKeydown(event, 'start')" oninput="onInputEdited('start')" />
+              <span id="badge_start" class="input-status-badge empty">未設定</span>
+              <button class="btn-search-loc" onclick="searchGeocode('start', null, true)" title="検索・地図反映">🔍</button>
+            </div>
+            <button class="btn-del-point" onclick="clearPoint('start')" title="出発地をクリア">✖</button>
+          </div>
+
+          <!-- Dynamic Via Points Container (2~3 points) -->
+          <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Via Actions Bar -->
+          <div class="via-actions-row">
+            <button id="btnAddVia" class="btn-add-via" onclick="addViaPointInput()">
+              <span>➕</span> 経由地を追加 (最大8箇所)
+            </button>
+            <button id="btnClearVias" class="btn-clear-vias" onclick="clearAllVias()" style="display:none;">
+              経由地を全消去
+            </button>
+          </div>
+
+          <!-- Destination / Turnaround Point -->
+          <div class="point-row" style="margin-top: 2px;">
+            <div id="destDot" class="point-dot end" onclick="focusAndPanTo('end')" title="クリックでこのピンに移動">折</div>
+            <div class="input-wrapper">
+              <input type="text" id="endInput" list="touringPlacesList" placeholder="目的地・折り返し (例: 志賀高原、伊豆、富士山)" 
+                     onfocus="setActiveFocus('end')" onblur="handleInputBlur('end')"
+                     onkeydown="handleInputKeydown(event, 'end')" oninput="onInputEdited('end')" />
+              <span id="badge_end" class="input-status-badge empty">未設定</span>
+              <button class="btn-search-loc" onclick="searchGeocode('end', null, true)" title="検索・地図反映">🔍</button>
+            </div>
+            <button class="btn-del-point" onclick="clearPoint('end')" title="目的地をクリア">✖</button>
+          </div>
+        </div>
+
+        <div id="focusTipBar" class="focus-tip-bar" style="display:none;">
+          <span>📍</span>
+          <span id="focusTipText">地図をクリックすると選択中の位置を変更できます</span>
+        </div>
+      </div>
+
+      <!-- Time Settings (Departure or Arrival Time) -->
+      <div class="card" id="cardTimeSettings">
+        <div class="card-title">
+          <div class="icon-wrap">
+            <span>🕒</span>
+            <span>ツーリング時刻 ＆ 営業時間判定</span>
+          </div>
+        </div>
+
+        <div class="time-settings-box">
+          <div class="time-mode-selector">
+            <label>
+              <input type="radio" name="timeType" value="departure" checked onchange="onTimeTypeChange()" />
+              <span>出発時刻を指定</span>
+            </label>
+            <label>
+              <input type="radio" name="timeType" value="arrival" onchange="onTimeTypeChange()" />
+              <span>帰着希望時刻を指定</span>
+            </label>
+          </div>
+
+          <div class="time-inputs-row">
+            <div class="time-picker-wrap">
+              <span style="font-size: 0.72rem; color: var(--gray-600); margin-right: 6px;" id="timeLabel">出発:</span>
+              <input type="time" id="timeInput" value="07:00" onchange="onTimeInputChange()" />
+            </div>
+            <div style="font-size: 0.72rem; color: var(--gray-600);">
+              ※通過予定時刻でスタンド営業判定
+            </div>
+          </div>
+
+          <div class="break-time-option">
+            <input type="checkbox" id="checkBreakTime" checked onchange="onBreakTimeToggle()" />
+            <label for="checkBreakTime">ツーリング休憩を考慮 (1.5時間ごとに15分休憩を加算)</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Motorcycle Specs & Fuel Settings -->
+      <div class="card" id="cardBikeSpecs">
+        <div class="card-title">
+          <div class="icon-wrap">
+            <span>⛽</span>
+            <span>バイク仕様 ＆ 航続距離設定</span>
+          </div>
+        </div>
+
+        <!-- Bike Preset Selector -->
+        <div style="margin-bottom: 10px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label for="bikePresetSelect" style="font-size: 0.72rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 4px;">
+              <span>🏍️</span> 車種プリセット
+            </label>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" onclick="saveCurrentBikePreset()" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 7px; font-size: 0.68rem; color: var(--secondary); cursor: pointer; font-weight: 600;">
+                💾 マイバイク保存
+              </button>
+              <button type="button" id="btnDeleteCustomPreset" onclick="deleteCurrentCustomPreset()" style="display: none; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 4px; padding: 2px 5px; font-size: 0.68rem; color: var(--danger); cursor: pointer; font-weight: 600;">
+                🗑️ 削除
+              </button>
+            </div>
+          </div>
+          <select id="bikePresetSelect" class="filter-select" onchange="onBikePresetChange()" style="width: 100%; font-size: 0.78rem;">
+            <option value="custom">直接入力 / カスタム設定</option>
+            <optgroup label="📋 代表的なバイク種別">
+              <option value="p_250_sport" data-tank="14" data-km="26">250cc スポーツ・ネイキッド (14L / 26km/L)</option>
+              <option value="p_400_std" data-tank="15" data-km="24">400cc スタンダード・GB350 (15L / 24km/L)</option>
+              <option value="p_heavy_tourer" data-tank="17" data-km="18">大型ツアラー・リッターネイキッド (17L / 18km/L)</option>
+              <option value="p_adv" data-tank="22" data-km="19">大型アドベンチャー (22L / 19km/L)</option>
+              <option value="p_cruiser" data-tank="11" data-km="28">クルーザー・レブル系 (11L / 28km/L)</option>
+              <option value="p_125_tourer" data-tank="7.5" data-km="45">原付二種 125cc・ハンターカブ (7.5L / 45km/L)</option>
+              <option value="p_cub" data-tank="4.3" data-km="55">カブ系・スモール (4.3L / 55km/L)</option>
+            </optgroup>
+            <optgroup label="⭐ マイバイク (保存済み)" id="myBikeOptGroup">
+              <!-- Dynamically populated from localStorage -->
+            </optgroup>
+          </select>
+        </div>
+
+        <div class="specs-grid">
+          <div class="spec-item">
+            <span class="spec-label">タンク容量</span>
+            <div class="spec-input-wrap">
+              <input type="number" id="tankCapacity" value="14.0" step="0.5" min="3" max="40" oninput="updateFuelCalculations()" />
+              <span class="spec-unit">L</span>
+            </div>
+          </div>
+          <div class="spec-item">
+            <span class="spec-label">実燃費</span>
+            <div class="spec-input-wrap">
+              <input type="number" id="fuelEconomy" value="22.0" step="0.5" min="5" max="80" oninput="updateFuelCalculations()" />
+              <span class="spec-unit">km/L</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Safety Margin Slider -->
+        <div class="slider-box">
+          <div class="slider-header">
+            <span class="spec-label">安全率しきい値 (給油推奨ライン)</span>
+            <span class="slider-val-badge" id="safetyMarginBadge">80 %</span>
+          </div>
+          <input type="range" id="safetyMarginRange" min="50" max="95" step="5" value="80" oninput="onSafetyMarginChange()" />
+          <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--gray-600); margin-top: 2px;">
+            <span>50% (超早め給油)</span>
+            <span>80% (標準目安)</span>
+            <span>95% (ギリギリ)</span>
+          </div>
+        </div>
+
+        <!-- Calculated Stats -->
+        <div class="fuel-calc-summary">
+          <div class="calc-stat-item">
+            <div class="val" id="valMaxRange">308 km</div>
+            <div class="lbl">理論最大航続距離</div>
+          </div>
+          <div class="calc-stat-item highlight">
+            <div class="val" id="valSafeTarget">246 km</div>
+            <div class="lbl">給油目標インターバル</div>
+          </div>
+          <div class="calc-stat-item">
+            <div class="val" id="valReserveRange">62 km</div>
+            <div class="lbl">残量マージン</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gas Station Filter Card -->
+      <div class="card" id="cardGsFilter">
+        <div class="card-title">
+          <div class="icon-wrap">
+            <span>🏪</span>
+            <span>給油スタンド条件 (ブランド・セルフ)</span>
+          </div>
+        </div>
+        <div class="filter-grid">
+          <div class="filter-item">
+            <label class="filter-label" for="filterGsBrand">希望ブランド</label>
+            <select id="filterGsBrand" class="filter-select" onchange="onGsFilterChange()">
+              <option value="all">指定なし (全ブランド)</option>
+              <option value="eneos">ENEOS (エネオス / EneKey)</option>
+              <option value="idemitsu">出光 / apollostation (DrivePay)</option>
+              <option value="cosmo">コスモ石油</option>
+              <option value="kygnus">キグナス石油</option>
+              <option value="major">大手3系列 (ENEOS/出光/コスモ)</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label class="filter-label" for="filterGsService">給油方式</label>
+            <select id="filterGsService" class="filter-select" onchange="onGsFilterChange()">
+              <option value="all">指定なし (セルフ・フル)</option>
+              <option value="self">セルフ給油限定 (Self)</option>
+              <option value="full">フルサービス限定</option>
+            </select>
+          </div>
+        </div>
+        <div style="font-size: 0.68rem; color: var(--gray-600); margin-top: 5px; line-height: 1.35;">
+          ※ツーリング先・山間部で条件に一致するGSがない場合は、安全のため近隣の営業中GSを自動案内します。
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button class="btn-primary" id="btnMainCalculate" onclick="calculateRouteAndFuelPlan()">
+        <span>🚀</span>
+        <span>ルート＆給油計画を計算</span>
+      </button>
+
+      <!-- Route Overview (hidden initially) -->
+      <div id="routeOverviewCard" class="card" style="display: none;">
+        <div class="card-title">
+          <div class="icon-wrap">
+            <span>📊</span>
+            <span>ツーリング行程サマリー</span>
+          </div>
+        </div>
+        <div class="route-banner">
+          <div class="route-banner-item">
+            <div class="val" id="routeTotalDist">- km</div>
+            <div class="lbl">総走行距離</div>
+          </div>
+          <div class="route-banner-item">
+            <div class="val" id="routeTotalDuration">- 時間</div>
+            <div class="lbl">所要時間 (走行+休憩)</div>
+          </div>
+          <div class="route-banner-item">
+            <div class="val" id="routeFuelStopsCount">0 回</div>
+            <div class="lbl">必要給油回数</div>
+          </div>
+        </div>
+
+        <div id="scheduleBar" class="schedule-bar">
+          <span id="schedStartText">出発: 07:00</span>
+          <span>➜</span>
+          <span id="schedEndText">帰着: 18:30</span>
+        </div>
+
+        <!-- Quick Save Button inside summary -->
+        <button class="btn-save-current-route" onclick="saveCurrentRoute()">
+          <span>💾</span> このルートをマイルートに保存する
+        </button>
+      </div>
+
+      <!-- Gas Station Plan Section -->
+      <div id="planSection" class="plan-section" style="display: none;">
+        <div class="card-title" style="margin-bottom: 2px;">
+          <div class="icon-wrap">
+            <span>🏁</span>
+            <span>給油＆タイムスケジュール</span>
+          </div>
+        </div>
+        <div id="planTimeline" class="plan-timeline">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Export to Google Maps -->
+      <div id="exportCard" class="export-box" style="display: none;">
+        <div style="font-size: 0.82rem; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 4px;">
+          <span>📲</span> Googleマップ / ナビ連携
+        </div>
+        <p style="font-size: 0.72rem; color: #3b82f6; line-height: 1.35; margin-bottom: 2px;">
+          給油スタンドおよび経由地を実際の走行順に組み込んだGoogleマップURLです。スマホで開くと直接Googleマップアプリでナビ開始できます。
+        </p>
+
+        <!-- Dynamically rendered single or multi-leg container -->
+        <div id="gmapsExportContainer">
+          <!-- Rendered by JS -->
+        </div>
+
+        <div class="export-secondary-row" style="margin-top: 6px;">
+          <button class="btn-gpx" onclick="downloadGpxFile()">
+            <span>💾</span> GPXファイル保存 (全行程一括)
+          </button>
+        </div>
+      </div>
+
+      <div style="font-size: 0.7rem; color: var(--gray-600); text-align: center; padding: 6px 0;">
+        OpenStreetMap & OSRM Engine | MotoFuel Planner
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- Map Container -->
+  <main id="map">
+    <div class="map-overlay-tip">
+      <span>👆</span>
+      <span id="mapTipText">ピンをドラッグして位置微調整、または地図クリックで設定できます</span>
+    </div>
+
+    <!-- GPS Locate Button -->
+    <button class="btn-gps-locate" onclick="locateUserPosition()" title="現在地を取得して出発地に設定">
+      <span>📍</span>
+    </button>
+
+    <!-- Mobile Floating Calculate Button -->
+    <button class="mobile-map-calc-btn" onclick="calculateRouteAndFuelPlan()">
+      <span>🚀</span>
+      <span>ルート＆給油計画を計算</span>
+    </button>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="map-loading-indicator">
+      <div class="spinner"></div>
+      <div id="loadingText">ルートと営業中スタンドを探索中...</div>
+    </div>
+  </main>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-nav-bar">
+    <button class="mobile-tab-btn" id="mobileTabBtnMap" onclick="switchMobileTab('map')">
+      <span class="tab-icon">🗺️</span>
+      <span>地図</span>
+    </button>
+    <button class="mobile-tab-btn active" id="mobileTabBtnSettings" onclick="switchMobileTab('settings')">
+      <span class="tab-icon">📝</span>
+      <span>ルート設定</span>
+    </button>
+    <button class="mobile-tab-btn" id="mobileTabBtnPlan" onclick="switchMobileTab('plan')">
+      <span class="tab-icon">⛽</span>
+      <span>給油・ナビ</span>
+      <span class="mobile-tab-badge" id="mobilePlanBadge">0</span>
+    </button>
+  </nav>
+
+  <!-- Toast Notification element -->
+  <div id="toast" class="toast-msg"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // ==========================================
+    // Japanese Touring & Landmark Gazetteer
+    // Fast, zero-failure instant lookup
+    // ==========================================
+    const JAPAN_LOCATIONS_DB = [
+      { name: "東京駅", lat: 35.6812, lng: 139.7671, aliases: ["東京", "tokyo", "とうきょう", "千代田区", "丸の内"] },
+      { name: "新宿駅", lat: 35.6909, lng: 139.7003, aliases: ["新宿", "shinjuku", "しんじゅく"] },
+      { name: "渋谷駅", lat: 35.6580, lng: 139.7016, aliases: ["渋谷", "shibuya", "しぶや"] },
+      { name: "池袋駅", lat: 35.7295, lng: 139.7109, aliases: ["池袋"] },
+      { name: "上野駅", lat: 35.7141, lng: 139.7774, aliases: ["上野"] },
+      { name: "品川駅", lat: 35.6284, lng: 139.7387, aliases: ["品川"] },
+      { name: "横浜駅", lat: 35.4658, lng: 139.6227, aliases: ["横浜", "yokohama", "よこはま"] },
+      { name: "川崎駅", lat: 35.5313, lng: 139.6969, aliases: ["川崎"] },
+      { name: "千葉駅", lat: 35.6131, lng: 140.1134, aliases: ["千葉"] },
+      { name: "大宮駅", lat: 35.9063, lng: 139.6240, aliases: ["大宮", "さいたま市", "埼玉"] },
+      { name: "八王子駅", lat: 35.6554, lng: 139.3389, aliases: ["八王子"] },
+      { name: "甲府駅", lat: 35.6672, lng: 138.5690, aliases: ["甲府", "山梨"] },
+      { name: "松本駅", lat: 36.2308, lng: 137.9644, aliases: ["松本"] },
+      { name: "長野駅", lat: 36.6431, lng: 138.1886, aliases: ["長野"] },
+      { name: "静岡駅", lat: 34.9717, lng: 138.3891, aliases: ["静岡"] },
+      { name: "浜松駅", lat: 34.7037, lng: 137.7344, aliases: ["浜松"] },
+      { name: "名古屋駅", lat: 35.1709, lng: 136.8815, aliases: ["名古屋", "nagoya", "愛知"] },
+      { name: "京都駅", lat: 34.9858, lng: 135.7588, aliases: ["京都", "kyoto"] },
+      { name: "大阪駅", lat: 34.7024, lng: 135.4959, aliases: ["大阪", "梅田", "osaka"] },
+      { name: "神戸駅", lat: 34.6798, lng: 135.1783, aliases: ["神戸", "三宮", "kobe", "兵庫"] },
+      { name: "高山駅", lat: 36.1428, lng: 137.2513, aliases: ["高山", "飛騨高山"] },
+      { name: "金沢駅", lat: 36.5780, lng: 136.6482, aliases: ["金沢", "石川"] },
+      { name: "仙台駅", lat: 38.2601, lng: 140.8824, aliases: ["仙台", "宮城"] },
+      { name: "宇都宮駅", lat: 36.5590, lng: 139.8983, aliases: ["宇都宮", "栃木"] },
+      { name: "高崎駅", lat: 36.3224, lng: 139.0127, aliases: ["高崎", "前橋", "群馬"] },
+
+      // Popular Touring Passes & Spots
+      { name: "美ヶ原高原 (ビーナスライン)", lat: 36.2267, lng: 138.2044, aliases: ["美ヶ原", "美ヶ原高原", "ビーナスライン", "うつくしがはら"] },
+      { name: "霧ヶ峰 (富士見台)", lat: 36.1033, lng: 138.1697, aliases: ["霧ヶ峰", "きりがみね", "霧ヶ峰高原"] },
+      { name: "白樺湖", lat: 36.1158, lng: 138.2393, aliases: ["白樺湖", "しらかばこ"] },
+      { name: "諏訪湖 SA (中央道)", lat: 36.0353, lng: 138.1065, aliases: ["諏訪湖SA", "諏訪湖サービスエリア", "諏訪SA"] },
+      { name: "諏訪湖", lat: 36.0489, lng: 138.0864, aliases: ["諏訪湖", "諏訪", "すわこ", "上諏訪"] },
+      { name: "箱根湯本", lat: 35.2319, lng: 139.1039, aliases: ["箱根", "箱根湯本駅", "はこね"] },
+      { name: "箱根ターンパイク入口", lat: 35.2530, lng: 139.0664, aliases: ["ターンパイク", "アネスト岩田ターンパイク", "小田原"] },
+      { name: "大観山展望台 (スカイラウンジ)", lat: 35.1873, lng: 139.0526, aliases: ["大観山", "大観山展望台", "たいかんざん"] },
+      { name: "芦ノ湖", lat: 35.2014, lng: 139.0044, aliases: ["芦ノ湖", "あしのこ", "元箱根"] },
+      { name: "伊豆スカイライン (亀石峠)", lat: 34.9781, lng: 139.0433, aliases: ["亀石峠", "伊豆スカイライン", "伊豆スカ", "かめいし"] },
+      { name: "道の駅 開国下田みなと", lat: 34.6784, lng: 138.9442, aliases: ["下田", "下田港", "下田みなと", "道の駅下田"] },
+      { name: "城ヶ崎海岸", lat: 34.8911, lng: 139.1307, aliases: ["城ヶ崎", "城ヶ崎海岸", "伊東"] },
+      { name: "富士山五合目 (スバルライン)", lat: 35.3606, lng: 138.7274, aliases: ["富士山五合目", "富士山", "スバルライン", "五合目", "富士スバルライン"] },
+      { name: "山中湖パノラマ台", lat: 35.4190, lng: 138.8950, aliases: ["山中湖", "パノラマ台", "山中湖パノラマ台"] },
+      { name: "河口湖", lat: 35.5171, lng: 138.7518, aliases: ["河口湖"] },
+      { name: "本栖湖", lat: 35.4617, lng: 138.6015, aliases: ["本栖湖", "浩庵キャンプ場"] },
+      { name: "朝霧高原 (道の駅 朝霧高原)", lat: 35.4057, lng: 138.5951, aliases: ["朝霧高原", "あさぎり"] },
+      { name: "道の駅 どうし (道志みち)", lat: 35.5134, lng: 139.0116, aliases: ["道志", "道志みち", "道の駅どうし", "どうし"] },
+      { name: "宮ヶ瀬湖 (鳥居原ふれあいの館)", lat: 35.5342, lng: 139.2274, aliases: ["宮ヶ瀬", "宮ヶ瀬湖", "鳥居原"] },
+      { name: "ヤビツ峠 (菜の花台)", lat: 35.4243, lng: 139.2152, aliases: ["ヤビツ峠", "ヤビツ", "菜の花台"] },
+      { name: "奥多摩湖 (大麦代駐車場)", lat: 35.7903, lng: 139.0519, aliases: ["奥多摩", "奥多摩湖", "大麦代", "おくたま", "奥多摩周遊道路"] },
+      { name: "草津温泉", lat: 36.6206, lng: 138.5960, aliases: ["草津", "草津温泉", "湯畑"] },
+      { name: "渋峠 (日本国道最高地点)", lat: 36.6575, lng: 138.5283, aliases: ["渋峠", "志賀草津道路", "国道最高地点"] },
+      { name: "日光東照宮", lat: 36.7581, lng: 139.5989, aliases: ["日光", "東照宮", "日光東照宮"] },
+      { name: "中禅寺湖 (いろは坂)", lat: 36.7358, lng: 139.4828, aliases: ["中禅寺湖", "いろは坂", "明智平"] },
+      { name: "針テラス (道の駅 針T・R・S)", lat: 34.6083, lng: 135.9493, aliases: ["針テラス", "名阪国道", "針TRS", "はりてらす"] },
+      { name: "青山高原", lat: 34.7088, lng: 136.2847, aliases: ["青山高原", "風車"] },
+      { name: "彦根城", lat: 35.2764, lng: 136.2518, aliases: ["彦根", "彦根城"] },
+      { name: "マキノ高原メタセコイア並木", lat: 35.4851, lng: 136.0392, aliases: ["メタセコイア", "メタセコイア並木", "マキノ", "マキノ高原"] },
+      { name: "奥琵琶湖パークウェイ (つづら尾崎)", lat: 35.4218, lng: 136.0827, aliases: ["奥琵琶湖", "奥琵琶湖パークウェイ", "つづら尾崎"] },
+      { name: "潮岬 (本州最南端)", lat: 33.4331, lng: 135.7622, aliases: ["潮岬", "本州最南端", "串本"] },
+      { name: "しまなみ海道 (来島海峡展望館)", lat: 34.1200, lng: 132.9980, aliases: ["しまなみ海道", "しまなみ", "今治", "尾道"] },
+      { name: "阿蘇大観峰", lat: 33.0427, lng: 131.0664, aliases: ["大観峰", "阿蘇", "阿蘇山", "ミルクロード"] },
+      { name: "千里浜なぎさドライブウェイ", lat: 36.8850, lng: 136.7620, aliases: ["千里浜", "なぎさドライブウェイ", "能登"] }
+    ];
+
+    // State management
+    let map;
+    let startPoint = null;      // { lat, lng, name }
+    let endPoint = null;        // { lat, lng, name }
+    const MAX_VIA_POINTS = 8;
+    let viaPoints = [];         // Array of { id, lat, lng, name, marker } (max 8)
+    let isRoundTrip = true;
+
+    let startMarker = null;
+    let endMarker = null;
+    let routePolyline = null;
+    let fuelMilestoneMarkers = [];
+    let gasStationMarkers = [];
+    let currentRouteData = null;
+    let plannedStops = [];
+
+    let activeFocusTarget = null;
+    let geocodeDebounceTimer = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      renderViaInputs();
+      renderBikePresetOptions();
+      updateFuelCalculations();
+      renderSavedRoutesList();
+      initMobileView();
+    });
+
+    // ==========================================
+    // Mobile View & Touch Tab Controller
+    // ==========================================
+    let currentMobileTab = 'settings';
+
+    function initMobileView() {
+      document.body.classList.add('mobile-tab-settings');
+      window.addEventListener('resize', () => {
+        if (map) map.invalidateSize();
+      });
+    }
+
+    function switchMobileTab(tab) {
+      currentMobileTab = tab;
+      document.body.classList.remove('mobile-tab-map', 'mobile-tab-settings', 'mobile-tab-plan');
+      document.body.classList.add(`mobile-tab-${tab}`);
+
+      const tabMap = document.getElementById('mobileTabBtnMap');
+      const tabSettings = document.getElementById('mobileTabBtnSettings');
+      const tabPlan = document.getElementById('mobileTabBtnPlan');
+
+      if (tabMap) tabMap.classList.toggle('active', tab === 'map');
+      if (tabSettings) tabSettings.classList.toggle('active', tab === 'settings');
+      if (tabPlan) tabPlan.classList.toggle('active', tab === 'plan');
+
+      if (tab === 'map' && map) {
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 50);
+      }
+
+      if (tab === 'plan') {
+        const sidebar = document.querySelector('.sidebar-content');
+        if (sidebar) sidebar.scrollTop = 0;
+      }
+    }
+
+    // ==========================================
+    // GPS Geolocation (ツーリング現在地取得)
+    // ==========================================
+    function locateUserPosition() {
+      if (!navigator.geolocation) {
+        alert("お使いのブラウザは位置情報(GPS)に対応していません。");
+        return;
+      }
+
+      showLoading("GPSから現在地を取得中... 📡");
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          hideLoading();
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          let placeName = "現在地";
+          try {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`;
+            const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.address) {
+                const addr = data.address;
+                placeName = addr.city || addr.town || addr.village || addr.suburb || addr.road || "現在地";
+                if (addr.road && placeName !== addr.road) placeName += ` (${addr.road})`;
+              }
+            }
+          } catch (e) {
+            console.warn("Reverse geocode failed", e);
+          }
+
+          setStartPoint(lat, lng, `現在地: ${placeName}`);
+          map.setView([lat, lng], 13);
+          showToast(`📍 現在地（${placeName}）を出発地に設定しました！`);
+
+          if (window.innerWidth <= 820) {
+            switchMobileTab('map');
+          }
+        },
+        (error) => {
+          hideLoading();
+          let msg = "位置情報の取得に失敗しました。";
+          if (error.code === 1) msg = "位置情報の利用が許可されていません。ブラウザの設定をご確認ください。";
+          else if (error.code === 2) msg = "GPS電波を受信できませんでした。";
+          else if (error.code === 3) msg = "位置情報の取得がタイムアウトしました。";
+          alert(msg);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    // ==========================================
+    // Bike Presets (Local Storage & Presets)
+    // ==========================================
+    function getCustomBikePresets() {
+      try {
+        const raw = localStorage.getItem('moto_bike_presets');
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveCustomBikePresetsToStorage(presets) {
+      try {
+        localStorage.setItem('moto_bike_presets', JSON.stringify(presets));
+      } catch (e) {}
+    }
+
+    function renderBikePresetOptions() {
+      const optGroup = document.getElementById('myBikeOptGroup');
+      if (!optGroup) return;
+      const customPresets = getCustomBikePresets();
+      optGroup.innerHTML = "";
+      if (customPresets.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = "";
+        opt.disabled = true;
+        opt.textContent = "（マイバイク未登録）";
+        optGroup.appendChild(opt);
+      } else {
+        customPresets.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = `custom_${p.id}`;
+          opt.dataset.tank = p.tank;
+          opt.dataset.km = p.km;
+          opt.dataset.presetId = p.id;
+          opt.textContent = `${p.name} (${p.tank}L / ${p.km}km/L)`;
+          optGroup.appendChild(opt);
+        });
+      }
+    }
+
+    function onBikePresetChange() {
+      const select = document.getElementById('bikePresetSelect');
+      const selectedOpt = select.options[select.selectedIndex];
+      const deleteBtn = document.getElementById('btnDeleteCustomPreset');
+
+      if (selectedOpt && selectedOpt.dataset.tank && selectedOpt.dataset.km) {
+        document.getElementById('tankCapacity').value = selectedOpt.dataset.tank;
+        document.getElementById('fuelEconomy').value = selectedOpt.dataset.km;
+        updateFuelCalculations();
+        showToast(`🏍️ ${selectedOpt.text} を適用しました`);
+      }
+
+      if (selectedOpt && selectedOpt.dataset.presetId) {
+        deleteBtn.style.display = 'inline-block';
+      } else {
+        deleteBtn.style.display = 'none';
+      }
+
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+      }
+    }
+
+    function saveCurrentBikePreset() {
+      const tank = parseFloat(document.getElementById('tankCapacity').value);
+      const km = parseFloat(document.getElementById('fuelEconomy').value);
+      if (!tank || !km || tank <= 0 || km <= 0) {
+        alert("有効なタンク容量と燃費を入力してください");
+        return;
+      }
+
+      const name = prompt("マイバイクの名前を入力してください (例: 俺のNinja400、セロー250):");
+      if (!name || !name.trim()) return;
+
+      const presets = getCustomBikePresets();
+      const newPreset = {
+        id: 'bike_' + Date.now(),
+        name: name.trim(),
+        tank: tank,
+        km: km
+      };
+      presets.push(newPreset);
+      saveCustomBikePresetsToStorage(presets);
+      renderBikePresetOptions();
+
+      const select = document.getElementById('bikePresetSelect');
+      select.value = `custom_${newPreset.id}`;
+      document.getElementById('btnDeleteCustomPreset').style.display = 'inline-block';
+      showToast(`⭐ マイバイク「${newPreset.name}」を保存しました！`);
+    }
+
+    function deleteCurrentCustomPreset() {
+      const select = document.getElementById('bikePresetSelect');
+      const selectedOpt = select.options[select.selectedIndex];
+      if (!selectedOpt || !selectedOpt.dataset.presetId) return;
+
+      if (!confirm(`マイバイク「${selectedOpt.text}」を削除しますか？`)) return;
+
+      let presets = getCustomBikePresets();
+      presets = presets.filter(p => p.id !== selectedOpt.dataset.presetId);
+      saveCustomBikePresetsToStorage(presets);
+      renderBikePresetOptions();
+      select.value = 'custom';
+      document.getElementById('btnDeleteCustomPreset').style.display = 'none';
+      showToast("マイバイクを削除しました 🗑️");
+    }
+
+    function initMap() {
+      // Centered cleanly on Central Japan
+      map = L.map('map', { zoomControl: true }).setView([35.6812, 138.8], 8);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      map.on('click', handleMapClick);
+    }
+
+    // ==========================================
+    // My Routes (Local Storage Management)
+    // ==========================================
+    function getSavedRoutes() {
+      try {
+        const raw = localStorage.getItem('moto_saved_routes');
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.error("Failed to read saved routes from localStorage", e);
+        return [];
+      }
+    }
+
+    function renderSavedRoutesList() {
+      const container = document.getElementById('savedRoutesList');
+      const routes = getSavedRoutes();
+
+      if (!routes || routes.length === 0) {
+        container.innerHTML = `
+          <div class="saved-empty-tip">
+            保存されたルートはありません。<br>
+            ルート作成後に「<strong>💾 現在のルートを保存</strong>」を押すとここに登録され、いつでも一発で呼び出せます。
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = "";
+      routes.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'saved-route-item';
+        item.onclick = () => loadSavedRoute(r.id);
+
+        const viaCountText = r.viaPoints && r.viaPoints.length > 0 ? `経由${r.viaPoints.length}箇所` : '直通';
+        const tripTypeText = r.isRoundTrip ? '往復' : '片道';
+        const distText = r.totalDistKm ? `${r.totalDistKm}` : '';
+        const fuelText = r.fuelStopsCount ? `給油${r.fuelStopsCount}` : '';
+
+        item.innerHTML = `
+          <div class="saved-route-info">
+            <div class="saved-route-name">${escapeXml(r.name)}</div>
+            <div class="saved-route-meta">
+              <span class="saved-route-tag">${tripTypeText}</span>
+              ${distText ? `<span class="saved-route-tag">${distText}</span>` : ''}
+              ${fuelText ? `<span class="saved-route-tag">${fuelText}</span>` : ''}
+              <span>${viaCountText}</span>
+              <span style="color:#94a3b8; font-size:0.65rem;">${r.createdAt || ''}</span>
+            </div>
+          </div>
+          <button class="btn-del-saved" onclick="deleteSavedRoute(${r.id}, event)" title="このルートを削除">🗑️</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function saveCurrentRoute() {
+      if (!startPoint || !startPoint.lat) {
+        alert("保存する前に、出発地を入力または地図から指定してください。");
+        document.getElementById('startInput').focus();
+        return;
+      }
+      if (!endPoint || !endPoint.lat) {
+        alert("保存する前に、目的地(折り返し地点)を入力または地図から指定してください。");
+        document.getElementById('endInput').focus();
+        return;
+      }
+
+      const defaultName = `${startPoint.name} ${isRoundTrip ? '⇄' : '➜'} ${endPoint.name}`;
+      const routeName = prompt("ルートの保存名を入力してください:", defaultName);
+      if (!routeName || !routeName.trim()) return;
+
+      const validVias = viaPoints
+        .filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "")
+        .map(v => ({ id: v.id, lat: v.lat, lng: v.lng, name: v.name }));
+
+      const totalDist = document.getElementById('routeTotalDist')?.textContent || "";
+      const fuelCount = document.getElementById('routeFuelStopsCount')?.textContent || "";
+
+      const newRoute = {
+        id: Date.now(),
+        name: routeName.trim(),
+        createdAt: new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        startPoint: { lat: startPoint.lat, lng: startPoint.lng, name: startPoint.name },
+        endPoint: { lat: endPoint.lat, lng: endPoint.lng, name: endPoint.name },
+        viaPoints: validVias,
+        isRoundTrip,
+        tankCapacity: document.getElementById('tankCapacity').value,
+        fuelEconomy: document.getElementById('fuelEconomy').value,
+        safetyMargin: document.getElementById('safetyMarginRange').value,
+        timeType: document.querySelector('input[name="timeType"]:checked').value,
+        timeVal: document.getElementById('timeInput').value,
+        breakTime: document.getElementById('checkBreakTime').checked,
+        bikePreset: document.getElementById('bikePresetSelect')?.value || 'custom',
+        filterGsBrand: document.getElementById('filterGsBrand')?.value || 'all',
+        filterGsService: document.getElementById('filterGsService')?.value || 'all',
+        totalDistKm: totalDist,
+        fuelStopsCount: fuelCount
+      };
+
+      const routes = getSavedRoutes();
+      routes.unshift(newRoute);
+      localStorage.setItem('moto_saved_routes', JSON.stringify(routes));
+
+      renderSavedRoutesList();
+      showToast(`「${newRoute.name}」をマイルートに保存しました！ 💾`);
+    }
+
+    function loadSavedRoute(id) {
+      const routes = getSavedRoutes();
+      const r = routes.find(item => item.id === id);
+      if (!r) return;
+
+      resetAllPointsAndRoute();
+
+      // Restore Round-trip switch
+      document.getElementById('checkRoundTrip').checked = r.isRoundTrip;
+      onRoundTripToggle();
+
+      // Restore Specs & Time
+      if (r.tankCapacity) document.getElementById('tankCapacity').value = r.tankCapacity;
+      if (r.fuelEconomy) document.getElementById('fuelEconomy').value = r.fuelEconomy;
+      if (r.safetyMargin) document.getElementById('safetyMarginRange').value = r.safetyMargin;
+      if (r.bikePreset && document.getElementById('bikePresetSelect')) {
+        document.getElementById('bikePresetSelect').value = r.bikePreset;
+      }
+      updateFuelCalculations();
+
+      if (r.timeType) {
+        const radio = document.querySelector(`input[name="timeType"][value="${r.timeType}"]`);
+        if (radio) radio.checked = true;
+        onTimeTypeChange();
+      }
+      if (r.timeVal) document.getElementById('timeInput').value = r.timeVal;
+      if (typeof r.breakTime === 'boolean') document.getElementById('checkBreakTime').checked = r.breakTime;
+      if (r.filterGsBrand && document.getElementById('filterGsBrand')) document.getElementById('filterGsBrand').value = r.filterGsBrand;
+      if (r.filterGsService && document.getElementById('filterGsService')) document.getElementById('filterGsService').value = r.filterGsService;
+
+      // Restore Points
+      setStartPoint(r.startPoint.lat, r.startPoint.lng, r.startPoint.name);
+      setEndPoint(r.endPoint.lat, r.endPoint.lng, r.endPoint.name);
+
+      if (r.viaPoints && r.viaPoints.length > 0) {
+        r.viaPoints.forEach(v => addViaPoint(v.lat, v.lng, v.name));
+      }
+
+      // Automatically recalculate route and display
+      calculateRouteAndFuelPlan();
+      showToast(`「${r.name}」を読み込みました 📂`);
+    }
+
+    function deleteSavedRoute(id, event) {
+      if (event) event.stopPropagation();
+      if (!confirm("この保存ルートを削除しますか？")) return;
+
+      let routes = getSavedRoutes();
+      routes = routes.filter(r => r.id !== id);
+      localStorage.setItem('moto_saved_routes', JSON.stringify(routes));
+      renderSavedRoutesList();
+      showToast("保存ルートを削除しました 🗑️");
+    }
+
+    // ==========================================
+    // Focus & Input Management
+    // ==========================================
+    function setActiveFocus(target) {
+      activeFocusTarget = target;
+      document.querySelectorAll('.input-wrapper input').forEach(el => el.classList.remove('active-focus'));
+      const activeInput = getInputElement(target);
+      if (activeInput) activeInput.classList.add('active-focus');
+
+      const bar = document.getElementById('focusTipBar');
+      const text = document.getElementById('focusTipText');
+      bar.style.display = 'flex';
+
+      if (target === 'start') {
+        text.textContent = '地図上をクリックすると「出発地」をその場所に設定します';
+      } else if (target === 'end') {
+        text.textContent = isRoundTrip ? '地図上をクリックすると「折り返し地点」を設定します' : '地図上をクリックすると「目的地」を設定します';
+      } else if (target && target.startsWith('via_')) {
+        text.textContent = '地図上をクリックすると「経由地」の位置を設定します';
+      }
+    }
+
+    function handleInputBlur(target) {
+      setTimeout(() => {
+        if (activeFocusTarget === target) {
+          activeFocusTarget = null;
+          document.getElementById('focusTipBar').style.display = 'none';
+          const el = getInputElement(target);
+          if (el) el.classList.remove('active-focus');
+        }
+      }, 350);
+    }
+
+    function getInputElement(target) {
+      if (target === 'start') return document.getElementById('startInput');
+      if (target === 'end') return document.getElementById('endInput');
+      if (target && target.startsWith('via_')) return document.getElementById(`viaInput_${target.replace('via_', '')}`);
+      return null;
+    }
+
+    function focusAndPanTo(target) {
+      let pt = null;
+      if (target === 'start') pt = startPoint;
+      else if (target === 'end') pt = endPoint;
+      else if (target && target.startsWith('via_')) {
+        const id = parseInt(target.replace('via_', ''), 10);
+        pt = viaPoints.find(v => v.id === id);
+      }
+      if (pt && pt.lat && pt.lng) {
+        map.setView([pt.lat, pt.lng], 13);
+        setActiveFocus(target);
+      }
+    }
+
+    // ==========================================
+    // Map Click Handler (Target-aware)
+    // ==========================================
+    function handleMapClick(e) {
+      const lat = parseFloat(e.latlng.lat.toFixed(5));
+      const lng = parseFloat(e.latlng.lng.toFixed(5));
+      const coordName = `地点 (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+
+      clearRouteVisualsOnly();
+
+      if (activeFocusTarget === 'start') {
+        setStartPoint(lat, lng, coordName);
+        showToast("出発地を地図から設定しました 🟢");
+      } else if (activeFocusTarget === 'end') {
+        setEndPoint(lat, lng, coordName);
+        showToast("目的地(折り返し)を地図から設定しました 🔴");
+      } else if (activeFocusTarget && activeFocusTarget.startsWith('via_')) {
+        const id = parseInt(activeFocusTarget.replace('via_', ''), 10);
+        updateViaPointCoords(id, lat, lng, coordName);
+        showToast("経由地を地図から設定しました 🟡");
+      } else {
+        if (!startPoint) {
+          setStartPoint(lat, lng, coordName);
+          showToast("出発地を設定しました 🟢");
+        } else if (!endPoint) {
+          setEndPoint(lat, lng, coordName);
+          showToast("目的地(折り返し)を設定しました 🔴");
+        } else if (viaPoints.length < MAX_VIA_POINTS) {
+          addViaPoint(lat, lng, coordName);
+          showToast(`経由地 #${viaPoints.length} を追加しました 🟡`);
+        } else {
+          setEndPoint(lat, lng, coordName);
+          showToast("目的地(折り返し)を更新しました 🔴");
+        }
+      }
+    }
+
+    // ==========================================
+    // Point Setters & Draggable Markers
+    // ==========================================
+    function setStartPoint(lat, lng, name) {
+      startPoint = { lat, lng, name };
+      const input = document.getElementById('startInput');
+      input.value = name;
+      input.classList.remove('error');
+      updateStatusBadge('start', 'ok');
+
+      if (startMarker) map.removeLayer(startMarker);
+
+      const icon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div class="custom-pin start" title="出発地 (ドラッグで移動可能)">発</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+
+      startMarker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
+        .bindPopup(`<b>🟢 出発地</b><br>${name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
+
+      startMarker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        startPoint.lat = parseFloat(pos.lat.toFixed(5));
+        startPoint.lng = parseFloat(pos.lng.toFixed(5));
+        startPoint.name = `地点 (${startPoint.lat.toFixed(3)}, ${startPoint.lng.toFixed(3)})`;
+        document.getElementById('startInput').value = startPoint.name;
+        clearRouteVisualsOnly();
+        showToast("出発地のピンを移動しました 📍");
+      });
+
+      clearRouteVisualsOnly();
+    }
+
+    function setEndPoint(lat, lng, name) {
+      endPoint = { lat, lng, name };
+      const input = document.getElementById('endInput');
+      input.value = name;
+      input.classList.remove('error');
+      updateStatusBadge('end', 'ok');
+
+      if (endMarker) map.removeLayer(endMarker);
+
+      const label = isRoundTrip ? "折" : "着";
+      const title = isRoundTrip ? "折り返し地点" : "目的地";
+
+      const icon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div class="custom-pin end" title="${title} (ドラッグで移動可能)">${label}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+
+      endMarker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
+        .bindPopup(`<b>🔴 ${title}</b><br>${name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
+
+      endMarker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        endPoint.lat = parseFloat(pos.lat.toFixed(5));
+        endPoint.lng = parseFloat(pos.lng.toFixed(5));
+        endPoint.name = `地点 (${endPoint.lat.toFixed(3)}, ${endPoint.lng.toFixed(3)})`;
+        document.getElementById('endInput').value = endPoint.name;
+        clearRouteVisualsOnly();
+        showToast("目的地のピンを移動しました 📍");
+      });
+
+      clearRouteVisualsOnly();
+    }
+
+    function clearPoint(type) {
+      if (type === 'start') {
+        if (startMarker) map.removeLayer(startMarker);
+        startMarker = null;
+        startPoint = null;
+        const input = document.getElementById('startInput');
+        input.value = "";
+        input.classList.remove('error');
+        updateStatusBadge('start', 'empty');
+      } else if (type === 'end') {
+        if (endMarker) map.removeLayer(endMarker);
+        endMarker = null;
+        endPoint = null;
+        const input = document.getElementById('endInput');
+        input.value = "";
+        input.classList.remove('error');
+        updateStatusBadge('end', 'empty');
+      }
+      clearRouteVisualsOnly();
+    }
+
+    function updateStatusBadge(type, status) {
+      const badge = document.getElementById(`badge_${type}`);
+      if (!badge) return;
+      badge.className = `input-status-badge ${status}`;
+      if (status === 'ok') {
+        badge.textContent = "✓ 確定";
+        badge.style.display = "inline-block";
+      } else if (status === 'pending') {
+        badge.textContent = "Enterで確定 ⏎";
+        badge.style.display = "inline-block";
+      } else if (status === 'error') {
+        badge.textContent = "未検出 ❌";
+        badge.style.display = "inline-block";
+      } else {
+        badge.textContent = "未設定";
+        badge.style.display = "inline-block";
+        badge.className = "input-status-badge empty";
+      }
+    }
+
+    function onInputEdited(type, viaId = null) {
+      clearRouteVisualsOnly();
+      const input = type === 'via' ? document.getElementById(`viaInput_${viaId}`) : getInputElement(type);
+      const text = input ? input.value.trim() : "";
+
+      if (!text) {
+        if (type === 'start') {
+          if (startMarker) map.removeLayer(startMarker);
+          startMarker = null;
+          startPoint = null;
+          updateStatusBadge('start', 'empty');
+        } else if (type === 'end') {
+          if (endMarker) map.removeLayer(endMarker);
+          endMarker = null;
+          endPoint = null;
+          updateStatusBadge('end', 'empty');
+        } else if (type === 'via') {
+          const v = viaPoints.find(item => item.id === viaId);
+          if (v) {
+            if (v.marker) map.removeLayer(v.marker);
+            v.marker = null;
+            v.lat = null;
+            v.lng = null;
+            v.name = "";
+            updateStatusBadge(`via_${viaId}`, 'empty');
+          }
+        }
+        return;
+      }
+
+      // 確定前は検索を走らせず、「未確定 (Enterで決定)」バッジを表示
+      updateStatusBadge(type === 'via' ? `via_${viaId}` : type, 'pending');
+      clearTimeout(geocodeDebounceTimer);
+    }
+
+    function handleInputKeydown(event, type, viaId = null) {
+      // 日本語IMEの変換中 (漢字変換確定のEnterなど) は検索を実行しない
+      if (event.isComposing || event.keyCode === 229) {
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        clearTimeout(geocodeDebounceTimer);
+        searchGeocode(type, viaId, true);
+      }
+    }
+
+    // ==========================================
+    // Via Points Management
+    // ==========================================
+    function renderViaInputs() {
+      const container = document.getElementById('viaPointsContainer');
+      container.innerHTML = "";
+
+      viaPoints.forEach((via, index) => {
+        const row = document.createElement('div');
+        row.className = 'point-row';
+        const isFirst = index === 0;
+        const isLast = index === viaPoints.length - 1;
+        const num = index + 1;
+
+        row.innerHTML = `
+          <div class="point-dot via" onclick="focusAndPanTo('via_${via.id}')" title="クリックでこのピンに移動">経${num}</div>
+          <div class="input-wrapper">
+            <input type="text" id="viaInput_${via.id}" list="touringPlacesList" value="${via.name || ''}" placeholder="経由地 ${num} (例: 諏訪湖、白樺湖、道の駅)" 
+                   onfocus="setActiveFocus('via_${via.id}')" onblur="handleInputBlur('via_${via.id}')"
+                   onkeydown="handleInputKeydown(event, 'via', ${via.id})" oninput="onInputEdited('via', ${via.id})" />
+            <span id="badge_via_${via.id}" class="input-status-badge ${via.lat ? 'ok' : 'pending'}">${via.lat ? '✓ 確定' : '未検索'}</span>
+            <button class="btn-search-loc" onclick="searchGeocode('via', ${via.id}, true)" title="検索・地図反映">🔍</button>
+          </div>
+          <div class="via-controls-wrap">
+            <button class="btn-move-via" onclick="moveViaPoint(${index}, -1)" ${isFirst ? 'disabled' : ''} title="順序を上に移動">▲</button>
+            <button class="btn-move-via" onclick="moveViaPoint(${index}, 1)" ${isLast ? 'disabled' : ''} title="順序を下に移動">▼</button>
+            <button class="btn-del-point" onclick="removeViaPoint(${via.id})" title="削除">✖</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+
+      const btnAdd = document.getElementById('btnAddVia');
+      const btnClearVias = document.getElementById('btnClearVias');
+      btnAdd.style.display = viaPoints.length >= MAX_VIA_POINTS ? 'none' : 'inline-flex';
+      btnAdd.innerHTML = `<span>➕</span> 経由地を追加 (最大${MAX_VIA_POINTS}箇所) <span style="font-size:0.65rem; color:#64748b; margin-left:3px;">[${viaPoints.length}/${MAX_VIA_POINTS}]</span>`;
+      btnClearVias.style.display = viaPoints.length > 0 ? 'inline-block' : 'none';
+    }
+
+    function moveViaPoint(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= viaPoints.length) return;
+
+      const temp = viaPoints[index];
+      viaPoints[index] = viaPoints[targetIndex];
+      viaPoints[targetIndex] = temp;
+
+      refreshViaMarkers();
+      renderViaInputs();
+      clearRouteVisualsOnly();
+      showToast(`経由地の順序を変更しました ↕️`);
+    }
+
+    function refreshViaMarkers() {
+      viaPoints.forEach((v, i) => {
+        const num = i + 1;
+        if (v.marker) {
+          const icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+          v.marker.setIcon(icon);
+          v.marker.bindPopup(`<b>🟡 経由地 #${num}</b><br>${v.name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
+        }
+      });
+    }
+
+    function addViaPointInput() {
+      if (viaPoints.length >= MAX_VIA_POINTS) return;
+      const newId = Date.now();
+      viaPoints.push({
+        id: newId,
+        lat: null,
+        lng: null,
+        name: "",
+        marker: null
+      });
+      renderViaInputs();
+      const input = document.getElementById(`viaInput_${newId}`);
+      if (input) {
+        input.focus();
+        setActiveFocus(`via_${newId}`);
+      }
+    }
+
+    function addViaPoint(lat, lng, name) {
+      if (viaPoints.length >= MAX_VIA_POINTS) return;
+      const id = Date.now();
+      const num = viaPoints.length + 1;
+
+      const icon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      const marker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
+        .bindPopup(`<b>🟡 経由地 #${num}</b><br>${name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
+
+      marker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        const v = viaPoints.find(item => item.id === id);
+        if (v) {
+          v.lat = parseFloat(pos.lat.toFixed(5));
+          v.lng = parseFloat(pos.lng.toFixed(5));
+          v.name = `地点 (${v.lat.toFixed(3)}, ${v.lng.toFixed(3)})`;
+          const inp = document.getElementById(`viaInput_${id}`);
+          if (inp) inp.value = v.name;
+          clearRouteVisualsOnly();
+          showToast(`経由地 #${num} のピンを移動しました 📍`);
+        }
+      });
+
+      viaPoints.push({ id, lat, lng, name, marker });
+      renderViaInputs();
+      clearRouteVisualsOnly();
+    }
+
+    function updateViaPointCoords(id, lat, lng, name) {
+      const v = viaPoints.find(item => item.id === id);
+      if (!v) return;
+      v.lat = lat;
+      v.lng = lng;
+      v.name = name;
+
+      const idx = viaPoints.findIndex(item => item.id === id);
+      const num = idx + 1;
+
+      if (v.marker) map.removeLayer(v.marker);
+
+      const icon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      v.marker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
+        .bindPopup(`<b>🟡 経由地 #${num}</b><br>${name}`);
+
+      v.marker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        v.lat = parseFloat(pos.lat.toFixed(5));
+        v.lng = parseFloat(pos.lng.toFixed(5));
+        v.name = `地点 (${v.lat.toFixed(3)}, ${v.lng.toFixed(3)})`;
+        const inp = document.getElementById(`viaInput_${id}`);
+        if (inp) inp.value = v.name;
+        clearRouteVisualsOnly();
+      });
+
+      const inp = document.getElementById(`viaInput_${id}`);
+      if (inp) inp.value = name;
+      updateStatusBadge(`via_${id}`, 'ok');
+      clearRouteVisualsOnly();
+    }
+
+    function removeViaPoint(id) {
+      const idx = viaPoints.findIndex(v => v.id === id);
+      if (idx !== -1) {
+        if (viaPoints[idx].marker) map.removeLayer(viaPoints[idx].marker);
+        viaPoints.splice(idx, 1);
+        refreshViaMarkers();
+        renderViaInputs();
+        clearRouteVisualsOnly();
+        showToast("経由地を削除しました");
+      }
+    }
+
+    function clearAllVias() {
+      viaPoints.forEach(v => {
+        if (v.marker) map.removeLayer(v.marker);
+      });
+      viaPoints = [];
+      renderViaInputs();
+      clearRouteVisualsOnly();
+      showToast("すべての経由地をクリアしました");
+    }
+
+    function resetAllPointsAndRoute() {
+      clearPoint('start');
+      clearPoint('end');
+      clearAllVias();
+      clearRouteOverlays();
+      map.setView([35.6812, 138.8], 8);
+      showToast("すべてのピンとルートをリセットしました 🗑️");
+    }
+
+    function clearRouteVisualsOnly() {
+      if (routePolyline) {
+        map.removeLayer(routePolyline);
+        routePolyline = null;
+      }
+      fuelMilestoneMarkers.forEach(m => map.removeLayer(m));
+      fuelMilestoneMarkers = [];
+      gasStationMarkers.forEach(m => map.removeLayer(m));
+      gasStationMarkers = [];
+      plannedStops = [];
+      document.getElementById('routeOverviewCard').style.display = 'none';
+      document.getElementById('planSection').style.display = 'none';
+      document.getElementById('exportCard').style.display = 'none';
+    }
+
+    function clearRouteOverlays() {
+      clearRouteVisualsOnly();
+    }
+
+    // ==========================================
+    // Geocoding Search
+    // ==========================================
+    async function searchGeocode(type, viaId = null, zoomToResult = true) {
+      let input = null;
+      if (type === 'start') input = document.getElementById('startInput');
+      else if (type === 'end') input = document.getElementById('endInput');
+      else if (type === 'via' && viaId) input = document.getElementById(`viaInput_${viaId}`);
+
+      if (!input) return null;
+      const query = input.value.trim();
+      const badgeId = type === 'via' ? `via_${viaId}` : type;
+
+      if (!query) {
+        input.classList.remove('error');
+        updateStatusBadge(badgeId, 'empty');
+        return null;
+      }
+
+      // 1. Direct coordinate match "35.68, 139.76"
+      const coordMatch = query.match(/([-+]?\d{1,3}(?:\.\d+)?)[,\s]+([-+]?\d{1,3}(?:\.\d+)?)/);
+      if (coordMatch) {
+        const lat = parseFloat(coordMatch[1]);
+        const lng = parseFloat(coordMatch[2]);
+        if (!isNaN(lat) && !isNaN(lng) && lat >= 20 && lat <= 50 && lng >= 120 && lng <= 155) {
+          applyLocationToState(type, viaId, lat, lng, query, zoomToResult);
+          return { lat, lng, name: query };
+        }
+      }
+
+      // 2. Local Database match
+      const cleanQ = query.toLowerCase().replace(/[\s\-_・]/g, '');
+      const matched = JAPAN_LOCATIONS_DB.find(loc => {
+        const cleanName = loc.name.toLowerCase().replace(/[\s\-_・]/g, '');
+        if (cleanName.includes(cleanQ) || cleanQ.includes(cleanName)) return true;
+        return loc.aliases.some(a => {
+          const cleanA = a.toLowerCase().replace(/[\s\-_・]/g, '');
+          return cleanQ.includes(cleanA) || cleanA.includes(cleanQ);
+        });
+      });
+
+      if (matched) {
+        applyLocationToState(type, viaId, matched.lat, matched.lng, matched.name, zoomToResult);
+        return { lat: matched.lat, lng: matched.lng, name: matched.name };
+      }
+
+      // 3. Fallback to OpenStreetMap Nominatim
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=jp`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lng = parseFloat(data[0].lon);
+            const displayName = data[0].display_name.split(',')[0];
+            applyLocationToState(type, viaId, lat, lng, displayName, zoomToResult);
+            return { lat, lng, name: displayName };
+          }
+        }
+      } catch (e) {
+        console.warn("Nominatim fetch error", e);
+      }
+
+      // Resolution failed
+      input.classList.add('error');
+      updateStatusBadge(badgeId, 'error');
+
+      if (type === 'start') {
+        if (startMarker) map.removeLayer(startMarker);
+        startMarker = null;
+        startPoint = null;
+      } else if (type === 'end') {
+        if (endMarker) map.removeLayer(endMarker);
+        endMarker = null;
+        endPoint = null;
+      } else if (type === 'via') {
+        const v = viaPoints.find(item => item.id === viaId);
+        if (v) {
+          if (v.marker) map.removeLayer(v.marker);
+          v.marker = null;
+          v.lat = null;
+          v.lng = null;
+        }
+      }
+
+      if (zoomToResult) {
+        showToast(`「${query}」の場所が特定できませんでした。駅名や地図クリックをお試しください。`);
+      }
+      return null;
+    }
+
+    function applyLocationToState(type, viaId, lat, lng, name, zoomTo = true) {
+      if (type === 'start') {
+        setStartPoint(lat, lng, name);
+      } else if (type === 'end') {
+        setEndPoint(lat, lng, name);
+      } else if (type === 'via' && viaId) {
+        updateViaPointCoords(viaId, lat, lng, name);
+      }
+
+      if (zoomTo) {
+        map.setView([lat, lng], 11);
+      }
+      showToast(`「${name}」のピンを設定しました 📍`);
+    }
+
+    // ==========================================
+    // Round Trip Toggle
+    // ==========================================
+    function onRoundTripToggle() {
+      const checkbox = document.getElementById('checkRoundTrip');
+      isRoundTrip = checkbox.checked;
+      const badge = document.getElementById('badgeRoundTrip');
+      const destDot = document.getElementById('destDot');
+      const endInput = document.getElementById('endInput');
+
+      if (isRoundTrip) {
+        badge.textContent = "往復モード";
+        badge.className = "badge-roundtrip active";
+        destDot.textContent = "折";
+        destDot.title = "折り返し地点";
+        endInput.placeholder = "目的地・折り返し (例: 志賀高原、伊豆、富士山)";
+      } else {
+        badge.textContent = "片道モード";
+        badge.className = "badge-roundtrip";
+        destDot.textContent = "着";
+        destDot.title = "目的地";
+        endInput.placeholder = "最終目的地 (例: 志賀高原、伊豆、富士山)";
+      }
+
+      if (endPoint) {
+        setEndPoint(endPoint.lat, endPoint.lng, endPoint.name);
+      }
+
+      clearRouteVisualsOnly();
+    }
+
+    // ==========================================
+    // Motorcycle Specs & Fuel Calculations
+    // ==========================================
+    function updateFuelCalculations() {
+      const tank = parseFloat(document.getElementById('tankCapacity').value) || 14;
+      const kmPerL = parseFloat(document.getElementById('fuelEconomy').value) || 20;
+      const marginPct = parseInt(document.getElementById('safetyMarginRange').value, 10) || 80;
+
+      const maxRange = Math.round(tank * kmPerL);
+      const safeTarget = Math.round(maxRange * (marginPct / 100));
+      const reserve = maxRange - safeTarget;
+
+      document.getElementById('valMaxRange').textContent = `${maxRange} km`;
+      document.getElementById('valSafeTarget').textContent = `${safeTarget} km`;
+      document.getElementById('valReserveRange').textContent = `${reserve} km`;
+      document.getElementById('safetyMarginBadge').textContent = `${marginPct} %`;
+
+      return { maxRange, safeTarget, reserve, marginPct };
+    }
+
+    function onSafetyMarginChange() {
+      updateFuelCalculations();
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+      }
+    }
+
+    function onTimeTypeChange() {
+      const isDep = document.querySelector('input[name="timeType"]:checked').value === 'departure';
+      document.getElementById('timeLabel').textContent = isDep ? "出発:" : "帰着:";
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+      }
+    }
+
+    function onTimeInputChange() {
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+      }
+    }
+
+    function onBreakTimeToggle() {
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+      }
+    }
+
+    // ==========================================
+    // Route Calculation (OSRM)
+    // ==========================================
+    async function calculateRouteAndFuelPlan() {
+      showLoading("ピン位置を確認中...");
+
+      const sText = document.getElementById('startInput').value.trim();
+      if (sText && (!startPoint || startPoint.name !== sText)) {
+        await searchGeocode('start', null, false);
+      }
+
+      const eText = document.getElementById('endInput').value.trim();
+      if (eText && (!endPoint || endPoint.name !== eText)) {
+        await searchGeocode('end', null, false);
+      }
+
+      for (const via of viaPoints) {
+        const inp = document.getElementById(`viaInput_${via.id}`);
+        const vText = inp ? inp.value.trim() : "";
+        if (vText && (!via.lat || via.name !== vText)) {
+          await searchGeocode('via', via.id, false);
+        }
+      }
+
+      hideLoading();
+
+      if (!startPoint || !startPoint.lat) {
+        alert("出発地が正しく設定されていません。地名を入力するか地図上をクリックしてください。");
+        document.getElementById('startInput').focus();
+        return;
+      }
+
+      if (!endPoint || !endPoint.lat) {
+        alert("目的地(折り返し)が正しく設定されていません。地名を入力するか地図上をクリックしてください。");
+        document.getElementById('endInput').focus();
+        return;
+      }
+
+      clearRouteVisualsOnly();
+      showLoading("OSRMでルートを算出中...");
+
+      try {
+        const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
+        let pointSequence = [startPoint, ...validVias, endPoint];
+
+        if (isRoundTrip) {
+          pointSequence.push(startPoint);
+        }
+
+        const coordsStr = pointSequence.map(p => `${p.lng},${p.lat}`).join(';');
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
+
+        const res = await fetch(osrmUrl);
+        const data = await res.json();
+
+        if (!data || data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+          throw new Error("ルートが検索できませんでした。経由地が孤立していないかご確認ください。");
+        }
+
+        const route = data.routes[0];
+        currentRouteData = route;
+
+        const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+        routePolyline = L.polyline(latlngs, {
+          color: '#1a73e8',
+          weight: 6,
+          opacity: 0.85,
+          lineJoin: 'round'
+        }).addTo(map);
+
+        map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+
+        const totalDistKm = (route.distance / 1000).toFixed(1);
+        
+        let totalDurationSeconds = route.duration;
+        const addBreak = document.getElementById('checkBreakTime').checked;
+        if (addBreak) {
+          const restBlocks = Math.floor(route.duration / 5400);
+          totalDurationSeconds += restBlocks * 900;
+        }
+
+        const totalHours = Math.floor(totalDurationSeconds / 3600);
+        const totalMins = Math.round((totalDurationSeconds % 3600) / 60);
+        const durationText = totalHours > 0 ? `${totalHours}時間${totalMins}分` : `${totalMins}分`;
+
+        document.getElementById('routeTotalDist').textContent = `${totalDistKm} km`;
+        document.getElementById('routeTotalDuration').textContent = durationText;
+        document.getElementById('routeOverviewCard').style.display = 'block';
+
+        await generateFuelPlanFromRoute(route, totalDurationSeconds);
+
+      } catch (err) {
+        console.error(err);
+        alert("ルート計算中にエラーが発生しました: " + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // ==========================================
+    // Fuel Milestones & Gas Stations Engine
+    // ==========================================
+    async function generateFuelPlanFromRoute(route, totalDurationSeconds = null) {
+      showLoading("給油ポイントと営業中スタンドを探索中...");
+
+      fuelMilestoneMarkers.forEach(m => map.removeLayer(m));
+      fuelMilestoneMarkers = [];
+      gasStationMarkers.forEach(m => map.removeLayer(m));
+      gasStationMarkers = [];
+      plannedStops = [];
+
+      const { safeTarget } = updateFuelCalculations();
+      const coords = route.geometry.coordinates;
+      const totalDistMeters = route.distance;
+      const targetIntervalMeters = safeTarget * 1000;
+
+      if (!totalDurationSeconds) {
+        totalDurationSeconds = route.duration;
+        if (document.getElementById('checkBreakTime').checked) {
+          totalDurationSeconds += Math.floor(route.duration / 5400) * 900;
+        }
+      }
+
+      const timeVal = document.getElementById('timeInput').value || "07:00";
+      const isDep = document.querySelector('input[name="timeType"]:checked').value === 'departure';
+      const [baseH, baseM] = timeVal.split(':').map(Number);
+
+      let startTimeDate = new Date();
+      startTimeDate.setHours(baseH, baseM, 0, 0);
+
+      let endTimeDate = new Date(startTimeDate.getTime());
+      if (isDep) {
+        endTimeDate = new Date(startTimeDate.getTime() + totalDurationSeconds * 1000);
+      } else {
+        endTimeDate = new Date(startTimeDate.getTime());
+        startTimeDate = new Date(endTimeDate.getTime() - totalDurationSeconds * 1000);
+      }
+
+      document.getElementById('schedStartText').textContent = `出発: ${formatTime(startTimeDate)}`;
+      document.getElementById('schedEndText').textContent = `${isRoundTrip ? '帰着' : '到着'}: ${formatTime(endTimeDate)}`;
+
+      let cumulativeDist = 0;
+      let nextTargetMeters = targetIntervalMeters;
+      let milestoneIndices = [];
+
+      for (let i = 1; i < coords.length; i++) {
+        const d = haversineDistance(coords[i-1][1], coords[i-1][0], coords[i][1], coords[i][0]);
+        cumulativeDist += d;
+
+        if (cumulativeDist >= nextTargetMeters && cumulativeDist < totalDistMeters - 20000) {
+          const ratio = cumulativeDist / totalDistMeters;
+          const etaTimestamp = new Date(startTimeDate.getTime() + ratio * totalDurationSeconds * 1000);
+
+          milestoneIndices.push({
+            coordIndex: i,
+            lat: coords[i][1],
+            lng: coords[i][0],
+            distanceKm: Math.round(cumulativeDist / 1000),
+            stopNumber: milestoneIndices.length + 1,
+            eta: etaTimestamp
+          });
+          nextTargetMeters += targetIntervalMeters;
+        }
+      }
+
+      document.getElementById('routeFuelStopsCount').textContent = `${milestoneIndices.length} 回`;
+
+      const timelineContainer = document.getElementById('planTimeline');
+      timelineContainer.innerHTML = "";
+
+      addTimelineStartNode(timelineContainer, startTimeDate);
+
+      for (const m of milestoneIndices) {
+        const milestoneIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="milestone-marker-pin" title="給油推奨ポイント #${m.stopNumber} (${m.distanceKm}km地点)">${m.stopNumber}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
+        });
+        const mMarker = L.marker([m.lat, m.lng], { icon: milestoneIcon }).addTo(map)
+          .bindPopup(`<b>給油推奨ライン #${m.stopNumber}</b><br>累積走行距離: 約 ${m.distanceKm} km<br>予定通過時刻: <b>${formatTime(m.eta)}</b>`);
+        fuelMilestoneMarkers.push(mMarker);
+
+        const gs = await findGasStationNearWithHours(m.lat, m.lng, m.distanceKm, m.stopNumber, m.eta);
+        plannedStops.push(gs);
+
+        const gsIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="gs-marker-pin ${gs.isOpen ? '' : 'closed'}" title="${gs.name} (${gs.hoursText})">⛽</div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+
+        const statusBadgeHtml = gs.is24h
+          ? `<span class="open-status-badge all-night">24時間営業 ⛽</span>`
+          : (gs.isOpen ? `<span class="open-status-badge open">営業中 ⭕ (${gs.hoursText})</span>` : `<span class="open-status-badge closed">営業時間外 ❌ (${gs.hoursText})</span>`);
+
+        const serviceBadgeHtml = `<span class="open-status-badge" style="background:#e0f2fe; color:#0369a1;">${gs.serviceText}</span>`;
+
+        const gsMarker = L.marker([gs.lat, gs.lng], { icon: gsIcon }).addTo(map)
+          .bindPopup(`
+            <div style="font-size:0.83rem;">
+              <b>⛽ ${gs.name}</b><br>
+              <div style="margin: 3px 0; display:flex; gap:4px; flex-wrap:wrap; align-items:center;">
+                ${statusBadgeHtml}
+                ${serviceBadgeHtml}
+              </div>
+              <span style="color:#e05300; font-weight:bold;">第${m.stopNumber}給油 (累積 ${m.distanceKm}km地点)</span><br>
+              予定到着: <b>${formatTime(m.eta)}</b><br>
+              回り道ロス: 約 ${gs.detourKm} km<br>
+              ブランド: <b>${gs.brand}</b><br>
+              <a href="https://www.google.com/maps/search/?api=1&query=${gs.lat},${gs.lng}" target="_blank" style="color:#1a73e8; font-weight:bold;">Googleマップで詳細を見る</a>
+            </div>
+          `);
+        gasStationMarkers.push(gsMarker);
+
+        addTimelineStopNode(timelineContainer, m, gs);
+      }
+
+      addTimelineDestNode(timelineContainer, (totalDistMeters / 1000).toFixed(1), endTimeDate);
+
+      document.getElementById('planSection').style.display = 'block';
+      document.getElementById('exportCard').style.display = 'block';
+
+      updateGoogleMapsExportLink();
+
+      // モバイルナビゲーションのバッジ更新＆プランタブへの自動切り替え
+      const badge = document.getElementById('mobilePlanBadge');
+      if (badge && plannedStops.length > 0) {
+        badge.textContent = plannedStops.length;
+        badge.style.display = 'inline-block';
+      }
+
+      if (window.innerWidth <= 820) {
+        switchMobileTab('plan');
+        showToast("給油計画とGoogleマップ連携が完成しました！⛽");
+      }
+    }
+
+    function onGsFilterChange() {
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+        showToast("スタンド絞り込み条件を反映しました ⛽");
+      }
+    }
+
+    async function findGasStationNearWithHours(lat, lng, distKm, stopNum, etaDate) {
+      const etaHour = etaDate.getHours() + etaDate.getMinutes() / 60;
+      const brandFilter = document.getElementById('filterGsBrand')?.value || 'all';
+      const serviceFilter = document.getElementById('filterGsService')?.value || 'all';
+      let nearbyCandidates = [];
+      
+      try {
+        // nodeだけでなくway(敷地)も含め、探索半径を10,000mに拡大して実在スタンドを漏れなく取得
+        const query = `[out:json][timeout:5];nwr["amenity"="fuel"](around:10000,${lat},${lng});out center 25;`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.elements && data.elements.length > 0) {
+            let bestMatch = null;
+            let brandMatch = null;
+            let anyOpenMatch = null;
+
+            for (const el of data.elements) {
+              const elLat = el.lat || (el.center && el.center.lat);
+              const elLng = el.lon || (el.center && el.center.lon);
+              if (!elLat || !elLng) continue;
+
+              const rawName = el.tags.name || el.tags.brand || el.tags.operator || "";
+              const brand = el.tags.brand || el.tags.operator || detectBrandFromName(rawName);
+              const opHoursTag = el.tags.opening_hours || "";
+              const hoursParsed = parseOpeningHours(opHoursTag, etaHour);
+
+              const isSelf = matchesServiceFilter(el.tags, rawName, 'self');
+              const isBrandMatch = matchesBrandFilter(brand, rawName, brandFilter);
+              const isServiceMatch = matchesServiceFilter(el.tags, rawName, serviceFilter);
+              const serviceText = isSelf ? "セルフ" : "フルサービス";
+
+              // 実在する店名。未設定ならブランド名+方面
+              const displayName = rawName ? rawName : `${brand} (${serviceText})`;
+
+              const cand = {
+                name: displayName,
+                brand,
+                serviceText,
+                isSelf,
+                lat: parseFloat(elLat.toFixed(5)),
+                lng: parseFloat(elLng.toFixed(5)),
+                detourKm: (haversineDistance(lat, lng, elLat, elLng) / 1000).toFixed(1),
+                distKm,
+                stopNum,
+                hoursText: hoursParsed.text,
+                isOpen: hoursParsed.isOpen,
+                is24h: hoursParsed.is24h,
+                isRealOsm: true
+              };
+
+              nearbyCandidates.push(cand);
+
+              if (!hoursParsed.isOpen) continue;
+
+              if (isBrandMatch && isServiceMatch) {
+                if (!bestMatch || parseFloat(cand.detourKm) < parseFloat(bestMatch.detourKm)) {
+                  bestMatch = cand;
+                }
+              } else if (isBrandMatch && !brandMatch) {
+                brandMatch = cand;
+              } else if (!anyOpenMatch) {
+                anyOpenMatch = cand;
+              }
+            }
+
+            // 距離順に並べ替え
+            nearbyCandidates.sort((a, b) => parseFloat(a.detourKm) - parseFloat(b.detourKm));
+
+            const picked = bestMatch || brandMatch || anyOpenMatch || nearbyCandidates[0];
+            if (picked) {
+              picked.nearbyCandidates = nearbyCandidates;
+              return picked;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Overpass API query timed out", e);
+      }
+
+      // Realistic Touring Stations Fallback
+      // 重要: 道路から外れて山の中や民家の屋根に飛ぶ原因だったランダムオフセットは完全排除！
+      // ルート線上の正確な座標(lat, lng)を使用し、道路沿いを確実にキープする
+      const isNightTime = etaHour < 7 || etaHour >= 21;
+      
+      let chosenBrand = "ENEOS";
+      if (brandFilter === 'eneos') {
+        chosenBrand = "ENEOS";
+      } else if (brandFilter === 'idemitsu') {
+        chosenBrand = "出光 / apollostation";
+      } else if (brandFilter === 'cosmo') {
+        chosenBrand = "コスモ石油";
+      } else if (brandFilter === 'kygnus') {
+        chosenBrand = "キグナス石油";
+      } else if (brandFilter === 'major') {
+        const majorBrands = ["ENEOS", "出光 / apollostation", "コスモ石油"];
+        chosenBrand = majorBrands[(stopNum - 1) % majorBrands.length];
+      } else {
+        const allBrands = ["ENEOS", "出光 / apollostation", "コスモ石油", "キグナス石油"];
+        chosenBrand = allBrands[(stopNum - 1) % allBrands.length];
+      }
+
+      let isSelf = (serviceFilter === 'self') ? true : (serviceFilter === 'full' ? false : (stopNum % 2 === 1));
+      let serviceText = isSelf ? "セルフ" : "フルサービス";
+
+      let is24h = isNightTime || (stopNum % 2 === 0);
+      let openStart = 7;
+      let openEnd = 20;
+      let hoursText = is24h ? "24時間営業" : "07:00 - 20:00";
+      let isOpen = is24h || (etaHour >= openStart && etaHour < openEnd);
+
+      if (isNightTime && !is24h) {
+        is24h = true;
+        isOpen = true;
+        hoursText = "24時間営業";
+      }
+
+      return {
+        name: `${chosenBrand} (${serviceText}) ルート給油所`,
+        brand: chosenBrand,
+        serviceText,
+        isSelf,
+        lat: parseFloat(lat.toFixed(5)),
+        lng: parseFloat(lng.toFixed(5)),
+        detourKm: "0.0",
+        distKm,
+        stopNum,
+        hoursText,
+        isOpen,
+        is24h,
+        nearbyCandidates: nearbyCandidates
+      };
+    }
+
+    function matchesBrandFilter(brandName, stationName, filter) {
+      if (!filter || filter === 'all') return true;
+      const s = ((brandName || '') + ' ' + (stationName || '')).toLowerCase();
+      if (filter === 'eneos') return s.includes('eneos') || s.includes('エネオス');
+      if (filter === 'idemitsu') return s.includes('出光') || s.includes('apollostation') || s.includes('apollo') || s.includes('アポロ') || s.includes('idemitsu') || s.includes('シェル') || s.includes('shell');
+      if (filter === 'cosmo') return s.includes('コスモ') || s.includes('cosmo');
+      if (filter === 'kygnus') return s.includes('キグナス') || s.includes('kygnus');
+      if (filter === 'major') {
+        return s.includes('eneos') || s.includes('エネオス') || s.includes('出光') || s.includes('apollostation') || s.includes('コスモ') || s.includes('シェル');
+      }
+      return true;
+    }
+
+    function matchesServiceFilter(tags, stationName, filter) {
+      if (!filter || filter === 'all') return true;
+      const sName = (stationName || '').toLowerCase();
+      const isSelf = (tags && tags.self_service === 'yes') || (tags && tags['self_service:diesel'] === 'yes') || sName.includes('セルフ') || sName.includes('self');
+      if (filter === 'self') return isSelf;
+      if (filter === 'full') return !isSelf;
+      return true;
+    }
+
+    function parseOpeningHours(tag, currentHour) {
+      if (!tag || /24\/7/i.test(tag)) {
+        return { is24h: true, isOpen: true, text: "24時間営業" };
+      }
+      const match = tag.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+      if (match) {
+        const startH = parseInt(match[1], 10);
+        const endH = parseInt(match[3], 10);
+        const isOpen = currentHour >= startH && currentHour < endH;
+        return { is24h: false, isOpen, text: `${match[1]}:${match[2]} - ${match[3]}:${match[4]}` };
+      }
+      return { is24h: false, isOpen: currentHour >= 7 && currentHour < 20, text: "07:00 - 20:00 (推定)" };
+    }
+
+    function detectBrandFromName(name) {
+      if (/eneos/i.test(name)) return "ENEOS";
+      if (/出光|apollostation/i.test(name)) return "出光 / apollostation";
+      if (/コスモ/i.test(name)) return "コスモ石油";
+      if (/キグナス/i.test(name)) return "キグナス石油";
+      if (/シェル|shell/i.test(name)) return "昭和シェル";
+      return "一般GS";
+    }
+
+    // ==========================================
+    // Timeline Builders
+    // ==========================================
+    function addTimelineStartNode(container, startDate) {
+      const node = document.createElement('div');
+      node.className = 'plan-node';
+      node.innerHTML = `
+        <div class="plan-card" style="background:#f0fdf4; border-color:#bbf7d0;">
+          <div class="plan-card-header">
+            <span class="plan-title" style="color:#166534;">🟢 出発: ${startPoint.name}</span>
+            <span class="plan-eta-badge">🕒 ${formatTime(startDate)} 出発</span>
+          </div>
+          <div style="font-size:0.7rem; color:#15803d;">タンク満タンで安全ツーリング開始</div>
+        </div>
+      `;
+      container.appendChild(node);
+    }
+
+    function addTimelineStopNode(container, m, gs) {
+      const node = document.createElement('div');
+      node.className = 'plan-node';
+
+      const statusBadge = gs.is24h
+        ? `<span class="open-status-badge all-night">24時間営業 ⛽</span>`
+        : (gs.isOpen ? `<span class="open-status-badge open">営業中 ⭕ (${gs.hoursText})</span>` : `<span class="open-status-badge closed">⚠️ 予定時刻は営業時間外 (${gs.hoursText})</span>`);
+
+      const candCount = (gs.nearbyCandidates && gs.nearbyCandidates.length > 0) ? ` (候補${gs.nearbyCandidates.length}件)` : '';
+
+      node.innerHTML = `
+        <div class="plan-card">
+          <div class="plan-card-header">
+            <span class="plan-title">⛽ 第${m.stopNumber}給油: ${escapeXml(gs.brand)}</span>
+            <span class="plan-eta-badge">🕒 ${formatTime(m.eta)} 着</span>
+          </div>
+          <div class="plan-gs-name" style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin: 4px 0;">
+            <span style="font-weight:700;">${escapeXml(gs.name)}</span>
+            <button class="btn-edit-gs" onclick="openGsModal(${m.stopNumber})" title="実在スタンド候補から選択、または店名検索で確定">
+              <span>✏️</span> 変更・名前確定${candCount}
+            </button>
+          </div>
+          <div class="plan-gs-detail">
+            ${statusBadge}
+            <span class="open-status-badge" style="background:#e0f2fe; color:#0369a1;">${escapeXml(gs.serviceText)}</span>
+            <span>📍 累積: ${m.distanceKm}km</span>
+            <span>回り道: 約${gs.detourKm}km</span>
+          </div>
+        </div>
+      `;
+      container.appendChild(node);
+    }
+
+    // ==========================================
+    // Gas Station Selection & Name Confirmation Modal
+    // ==========================================
+    let activeModalStopNum = null;
+
+    function openGsModal(stopNum) {
+      activeModalStopNum = stopNum;
+      const gs = plannedStops[stopNum - 1];
+      if (!gs) return;
+
+      document.getElementById('gsModalTitle').textContent = `⛽ 第${stopNum}給油スタンドの変更・名前確定`;
+      document.getElementById('gsModalCurrentName').textContent = gs.name;
+      document.getElementById('gsModalCurrentMeta').textContent = `${gs.brand} | ${gs.serviceText} | 座標: ${gs.lat}, ${gs.lng} (回り道約 ${gs.detourKm}km)`;
+
+      document.getElementById('gsModalSearchInput').value = "";
+      document.getElementById('gsModalSearchResults').innerHTML = "";
+      document.getElementById('gsModalSearchLoading').style.display = "none";
+
+      const candList = document.getElementById('gsModalCandidatesList');
+      candList.innerHTML = "";
+      const candidates = gs.nearbyCandidates || [];
+      document.getElementById('gsModalCandCount').textContent = `${candidates.length} 件`;
+
+      if (candidates.length === 0) {
+        candList.innerHTML = `
+          <div style="font-size:0.72rem; color:#64748b; padding:8px; text-align:center;">
+            近隣の自動候補はありません。上のキーワード検索から実在スタンドを検索して確定できます。
+          </div>
+        `;
+      } else {
+        candidates.forEach(cand => {
+          const isCurrent = (cand.lat === gs.lat && cand.lng === gs.lng);
+          const item = document.createElement('div');
+          item.className = `gs-cand-item ${isCurrent ? 'selected' : ''}`;
+          item.onclick = () => selectCustomGs(stopNum, cand);
+          item.innerHTML = `
+            <div style="font-size:0.75rem;">
+              <div style="font-weight:700; color:#1e293b;">${escapeXml(cand.name)} ${isCurrent ? '⭐(現在設定中)' : ''}</div>
+              <div style="font-size:0.68rem; color:#64748b; margin-top:2px;">
+                ${escapeXml(cand.brand)} | ${escapeXml(cand.serviceText)} | 営業時間: ${cand.hoursText} | 回り道: 約${cand.detourKm}km
+              </div>
+            </div>
+            <button type="button" style="padding:3px 8px; border-radius:4px; border:1px solid #3b82f6; background:#eff6ff; color:#1d4ed8; font-size:0.7rem; font-weight:700; cursor:pointer; flex-shrink:0;">
+              確定
+            </button>
+          `;
+          candList.appendChild(item);
+        });
+      }
+
+      document.getElementById('gsModalOverlay').style.display = 'flex';
+    }
+
+    function closeGsModal() {
+      document.getElementById('gsModalOverlay').style.display = 'none';
+      activeModalStopNum = null;
+    }
+
+    function selectCustomGs(stopNum, chosenGs) {
+      if (!chosenGs || !chosenGs.lat || !chosenGs.lng) return;
+      const idx = stopNum - 1;
+      if (idx < 0 || idx >= plannedStops.length) return;
+
+      const oldCand = plannedStops[idx].nearbyCandidates || [];
+      plannedStops[idx] = {
+        ...plannedStops[idx],
+        name: chosenGs.name,
+        brand: chosenGs.brand || detectBrandFromName(chosenGs.name),
+        serviceText: chosenGs.serviceText || "セルフ",
+        isSelf: chosenGs.isSelf ?? true,
+        lat: chosenGs.lat,
+        lng: chosenGs.lng,
+        detourKm: chosenGs.detourKm || "0.2",
+        hoursText: chosenGs.hoursText || "営業時間確認推奨",
+        isOpen: true,
+        is24h: chosenGs.is24h ?? false,
+        nearbyCandidates: oldCand
+      };
+
+      if (gasStationMarkers[idx]) {
+        gasStationMarkers[idx].setLatLng([chosenGs.lat, chosenGs.lng]);
+        gasStationMarkers[idx].setPopupContent(`
+          <div style="font-size:0.83rem;">
+            <b>⛽ ${escapeXml(chosenGs.name)}</b><br>
+            <span style="color:#e05300; font-weight:bold;">第${stopNum}給油 (カスタム確定済)</span><br>
+            ブランド: <b>${escapeXml(chosenGs.brand)}</b><br>
+            <a href="https://www.google.com/maps/search/?api=1&query=${chosenGs.lat},${chosenGs.lng}" target="_blank" style="color:#1a73e8; font-weight:bold;">Googleマップで詳細を見る</a>
+          </div>
+        `);
+      }
+
+      refreshTimelineAndExportOnly();
+      closeGsModal();
+      showToast(`⛽ 第${stopNum}給油所を「${chosenGs.name}」に確定しました！`);
+    }
+
+    async function searchGsByKeyword() {
+      const q = document.getElementById('gsModalSearchInput').value.trim();
+      if (!q) {
+        alert("検索キーワード（店名や地域名）を入力してください");
+        return;
+      }
+      if (!activeModalStopNum) return;
+
+      const currentGs = plannedStops[activeModalStopNum - 1];
+      const resultsDiv = document.getElementById('gsModalSearchResults');
+      const loadingDiv = document.getElementById('gsModalSearchLoading');
+
+      resultsDiv.innerHTML = "";
+      loadingDiv.style.display = "block";
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=6&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+        const list = await res.json();
+        loadingDiv.style.display = "none";
+
+        if (!list || list.length === 0) {
+          resultsDiv.innerHTML = `<div style="font-size:0.72rem; color:#dc2626; padding:6px;">一致する場所が見つかりませんでした。別のキーワードでお試しください。</div>`;
+          return;
+        }
+
+        list.forEach(item => {
+          const itemLat = parseFloat(item.lat);
+          const itemLon = parseFloat(item.lon);
+          const distFromMilestone = currentGs ? (haversineDistance(currentGs.lat, currentGs.lng, itemLat, itemLon) / 1000).toFixed(1) : "?";
+          const detectedBrand = detectBrandFromName(item.display_name);
+
+          const card = document.createElement('div');
+          card.className = 'gs-cand-item';
+          card.onclick = () => {
+            selectCustomGs(activeModalStopNum, {
+              name: item.name || q,
+              brand: detectedBrand,
+              serviceText: "セルフ",
+              isSelf: true,
+              lat: parseFloat(itemLat.toFixed(5)),
+              lng: parseFloat(itemLon.toFixed(5)),
+              detourKm: distFromMilestone,
+              hoursText: "営業時間確認推奨",
+              is24h: false
+            });
+          };
+
+          card.innerHTML = `
+            <div style="font-size:0.75rem;">
+              <div style="font-weight:700; color:#1e293b;">${escapeXml(item.name || q)}</div>
+              <div style="font-size:0.67rem; color:#64748b; margin-top:2px;">
+                ${escapeXml(item.display_name.slice(0, 45))}... (給油ラインから約${distFromMilestone}km)
+              </div>
+            </div>
+            <button type="button" style="padding:3px 8px; border-radius:4px; border:1px solid #10b981; background:#ecfdf5; color:#065f46; font-size:0.7rem; font-weight:700; cursor:pointer; flex-shrink:0;">
+              この場所に確定
+            </button>
+          `;
+          resultsDiv.appendChild(card);
+        });
+
+      } catch (err) {
+        loadingDiv.style.display = "none";
+        resultsDiv.innerHTML = `<div style="font-size:0.72rem; color:#dc2626; padding:6px;">検索中にエラーが発生しました: ${err.message}</div>`;
+      }
+    }
+
+    function refreshTimelineAndExportOnly() {
+      if (!currentRouteData) return;
+      const timelineContainer = document.getElementById('planTimeline');
+      timelineContainer.innerHTML = "";
+
+      const timeVal = document.getElementById('timeInput').value || "07:00";
+      const [baseH, baseM] = timeVal.split(':').map(Number);
+      let startTimeDate = new Date();
+      startTimeDate.setHours(baseH, baseM, 0, 0);
+
+      addTimelineStartNode(timelineContainer, startTimeDate);
+
+      plannedStops.forEach((gs, i) => {
+        const m = {
+          stopNumber: i + 1,
+          distanceKm: gs.distKm,
+          eta: new Date(startTimeDate.getTime() + (i + 1) * 3600 * 1000)
+        };
+        addTimelineStopNode(timelineContainer, m, gs);
+      });
+
+      const totalKm = (currentRouteData.distance / 1000).toFixed(1);
+      const endDate = new Date(startTimeDate.getTime() + currentRouteData.duration * 1000);
+      addTimelineDestNode(timelineContainer, totalKm, endDate);
+
+      updateGoogleMapsExportLink();
+    }
+
+    function addTimelineDestNode(container, totalKm, endDate) {
+      const node = document.createElement('div');
+      const isLoop = isRoundTrip;
+      node.className = `plan-node destination`;
+
+      const title = isLoop ? `🏁 帰着: ${startPoint.name}` : `🏁 到着: ${endPoint.name}`;
+      const sub = isLoop ? `全行程 ${totalKm} km 走破！お疲れ様でした` : `目的地到着！総走行距離 ${totalKm} km`;
+
+      node.innerHTML = `
+        <div class="plan-card" style="background:#fef2f2; border-color:#fecaca;">
+          <div class="plan-card-header">
+            <span class="plan-title" style="color:#991b1b;">${title}</span>
+            <span class="plan-eta-badge" style="background:#fee2e2; color:#991b1b;">🕒 ${formatTime(endDate)} 着</span>
+          </div>
+          <div style="font-size:0.7rem; color:#991b1b;">${sub}</div>
+        </div>
+      `;
+      container.appendChild(node);
+    }
+
+    // ==========================================
+    // Google Maps Link Builder (Multi-leg Splitting)
+    // ==========================================
+    function updateGoogleMapsExportLink() {
+      const container = document.getElementById('gmapsExportContainer');
+      if (!container) return;
+      if (!startPoint || !endPoint || !currentRouteData) {
+        container.innerHTML = `<div style="font-size:0.75rem; color:#64748b; padding:4px 0;">ルート計算完了後にGoogleマップリンクが表示されます</div>`;
+        return;
+      }
+
+      const coords = currentRouteData.geometry.coordinates;
+
+      // Helper to find closest coordinate index along the route
+      function getRouteCoordIndex(lat, lng, searchStart = 0, searchEnd = coords.length - 1) {
+        let bestIdx = searchStart;
+        let bestDist = Infinity;
+        for (let i = searchStart; i <= searchEnd; i++) {
+          const d = haversineDistance(lat, lng, coords[i][1], coords[i][0]);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
+        }
+        return bestIdx;
+      }
+
+      const startStop = {
+        type: 'start',
+        name: startPoint.name,
+        lat: startPoint.lat,
+        lng: startPoint.lng,
+        coordIndex: 0
+      };
+
+      let turnaroundIdx = coords.length - 1;
+      let endStop = null;
+      if (isRoundTrip) {
+        turnaroundIdx = getRouteCoordIndex(endPoint.lat, endPoint.lng, 0, coords.length - 1);
+        endStop = {
+          type: 'turnaround',
+          name: `折り返し: ${endPoint.name}`,
+          lat: endPoint.lat,
+          lng: endPoint.lng,
+          coordIndex: turnaroundIdx
+        };
+      } else {
+        endStop = {
+          type: 'destination',
+          name: `目的地: ${endPoint.name}`,
+          lat: endPoint.lat,
+          lng: endPoint.lng,
+          coordIndex: coords.length - 1
+        };
+      }
+
+      const validVias = viaPoints
+        .filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "")
+        .map((v, i) => {
+          const idx = getRouteCoordIndex(v.lat, v.lng, 0, coords.length - 1);
+          return {
+            type: 'via',
+            name: `経由地 #${i + 1}: ${v.name}`,
+            lat: v.lat,
+            lng: v.lng,
+            coordIndex: idx
+          };
+        });
+
+      const gsStops = plannedStops.map(gs => {
+        const idx = getRouteCoordIndex(gs.lat, gs.lng, 0, coords.length - 1);
+        return {
+          type: 'gs',
+          name: `⛽ ${gs.name}`,
+          lat: gs.lat,
+          lng: gs.lng,
+          coordIndex: idx
+        };
+      });
+
+      const finalStop = isRoundTrip ? {
+        type: 'destination',
+        name: `帰着: ${startPoint.name}`,
+        lat: startPoint.lat,
+        lng: startPoint.lng,
+        coordIndex: coords.length - 1
+      } : endStop;
+
+      // Intermediate stops strictly ordered by route driving progression
+      let intermediateStops = [...validVias, ...gsStops];
+      if (isRoundTrip) {
+        intermediateStops.push(endStop);
+      }
+
+      intermediateStops.sort((a, b) => a.coordIndex - b.coordIndex);
+
+      const allOrderedStops = [startStop, ...intermediateStops, finalStop];
+
+      // Google Maps URL limit: max 10 total stops (origin + destination + 8 intermediates)
+      // Using slash-path format: /maps/dir/stop1/stop2/.../stopN/
+      // This format ALWAYS shows every stop as a labeled pin (A, B, C…) in the route panel.
+      // The ?api=1&waypoints= format can silently treat stops as invisible pass-through points.
+      const MAX_INTERMEDIATE_PER_LEG = 8; // 8 intermediates = 10 total stops per leg
+
+      // Build a Google Maps URL using slash-path format: each stop shows as a labeled pin
+      function buildLegUrl(origin, waypoints, destination) {
+        const allStops = [origin, ...waypoints, destination];
+        const path = allStops.map(s => `${s.lat},${s.lng}`).join('/');
+        return `https://www.google.com/maps/dir/${path}/`;
+      }
+
+      const pinLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+
+      function renderStopsPinListHtml(stops) {
+        return `
+          <div style="margin: 8px 0; font-size: 0.74rem; background: #ffffff; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <div style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 0.7rem;">📍 Googleマップ上のピン番号対応:</div>
+            ${stops.map((s, idx) => {
+              const letter = pinLetters[idx] || `${idx + 1}`;
+              const isGs = s.type === 'gs';
+              const isStart = s.type === 'start';
+              const isEnd = s.type === 'destination' || s.type === 'turnaround';
+              const badgeBg = isGs ? '#ff6b00' : (isStart ? '#10b981' : (isEnd ? '#ef4444' : '#3b82f6'));
+              return `
+                <div style="display:flex; align-items:center; gap:6px; margin: 3px 0;">
+                  <span style="background:${badgeBg}; color:#fff; font-size: 0.65rem; font-weight: 800; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">${letter}</span>
+                  <span style="${isGs ? 'font-weight:bold; color:#d93025;' : (isStart || isEnd ? 'font-weight:600; color:#1e293b;' : 'color:#334155;')}">${escapeXml(s.name)}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      if (intermediateStops.length <= MAX_INTERMEDIATE_PER_LEG) {
+        // Single Leg — all stops fit within Google Maps 10-point limit
+        const url = buildLegUrl(startStop, intermediateStops, finalStop);
+        const totalPins = 2 + intermediateStops.length;
+        const gsCount = intermediateStops.filter(s => s.type === 'gs').length;
+
+        container.innerHTML = `
+          <div class="leg-card" style="border-color:#93c5fd; background:#f0f9ff;">
+            <div class="leg-card-header">
+              <span class="leg-badge">全行程ルート</span>
+              <span class="leg-stop-count">📍 合計 ${totalPins} 地点 (給油スタンド ${gsCount} 箇所含む)</span>
+            </div>
+            <div class="leg-route-title">${escapeXml(startStop.name)} ➜ ${escapeXml(finalStop.name)}</div>
+            ${renderStopsPinListHtml(allOrderedStops)}
+            <div class="leg-btn-group">
+              <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                <span>Googleマップで全行程を開く</span>
+              </a>
+              <button class="btn-leg-copy" data-copy-url="${url}">📋 URLコピー</button>
+            </div>
+          </div>
+        `;
+      } else {
+        // Multi-leg: split into chunks of MAX_INTERMEDIATE_PER_LEG each
+        // Each leg: origin → [up to 8 intermediate stops] → destination
+        // The destination of one leg becomes the origin of the next
+        const legs = [];
+        let currentOrigin = startStop;
+        let remainingIntermediates = [...intermediateStops];
+
+        while (remainingIntermediates.length > 0) {
+          if (remainingIntermediates.length <= MAX_INTERMEDIATE_PER_LEG) {
+            // Last leg — remaining stops all fit
+            legs.push({
+              origin: currentOrigin,
+              waypoints: remainingIntermediates,
+              destination: finalStop
+            });
+            break;
+          } else {
+            // Take up to MAX_INTERMEDIATE_PER_LEG stops for this leg
+            // The (MAX_INTERMEDIATE_PER_LEG)-th stop becomes the destination of this leg
+            // and the origin of the next
+            const legWaypoints = remainingIntermediates.slice(0, MAX_INTERMEDIATE_PER_LEG - 1);
+            const legDest = remainingIntermediates[MAX_INTERMEDIATE_PER_LEG - 1];
+            legs.push({
+              origin: currentOrigin,
+              waypoints: legWaypoints,
+              destination: legDest
+            });
+            currentOrigin = legDest;
+            remainingIntermediates = remainingIntermediates.slice(MAX_INTERMEDIATE_PER_LEG);
+          }
+        }
+
+        const badgeColors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899'];
+        const badgeTextColors = ['#fff','#fff','#fff','#fff','#fff','#fff'];
+
+        let html = `
+          <div class="multi-leg-notice">
+            <span>💡</span>
+            <div>
+              経由地＋給油所が<strong>合計 ${2 + intermediateStops.length} 地点</strong>あり、Googleマップの仕様(最大10地点)を超えるため<strong>【ルート1】〜【ルート${legs.length}】</strong>に自動分割しました。<br>
+              <span style="color:#059669;font-weight:600;">⛽ 給油スタンドも各区間の中継地点（ピン）として確実に組み込まれています。</span><br>
+              区間ごとに順番にGoogleマップを開いてナビを開始できます。
+            </div>
+          </div>
+          <div class="multi-leg-list">
+        `;
+
+        legs.forEach((leg, idx) => {
+          const legNum = idx + 1;
+          const color = badgeColors[(legNum - 1) % badgeColors.length];
+          const textColor = badgeTextColors[(legNum - 1) % badgeTextColors.length];
+          const legPhase = legNum === 1 ? '前半' : (legNum === legs.length ? '後半' : `中盤${legNum - 1}`);
+          const url = buildLegUrl(leg.origin, leg.waypoints, leg.destination);
+          const totalLegPins = 2 + leg.waypoints.length;
+
+          const allLegStops = [leg.origin, ...leg.waypoints, leg.destination];
+          const gsInLeg = leg.waypoints.filter(s => s.type === 'gs').length;
+
+          html += `
+            <div class="leg-card">
+              <div class="leg-card-header">
+                <span class="leg-badge" style="background:${color};color:${textColor};">ルート${legNum} (${legPhase})</span>
+                <span class="leg-stop-count">📍 ${totalLegPins} 地点 / ⛽ ${gsInLeg} 給油所</span>
+              </div>
+              <div class="leg-route-title">${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}</div>
+              ${renderStopsPinListHtml(allLegStops)}
+              <div class="leg-btn-group">
+                <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener">
+                  <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  <span>Googleマップ【ルート${legNum}】を開く</span>
+                </a>
+                <button class="btn-leg-copy" data-copy-url="${url}">📋 URLコピー</button>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+      }
+    }
+
+    function copySpecificUrl(url) {
+      if (!url) return;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast("Googleマップの区間ルートURLをコピーしました！📋");
+      }).catch(() => {
+        prompt("以下のURLをコピーしてください:", url);
+      });
+    }
+
+    function escapeJsString(str) {
+      return (str || "").replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    // Use event delegation for copy buttons (avoids HTML attribute escaping issues with & in URLs)
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-copy-url]');
+      if (btn) {
+        const url = btn.getAttribute('data-copy-url');
+        copySpecificUrl(url);
+      }
+    });
+
+    // ==========================================
+    // GPX Exporter
+    // ==========================================
+    function downloadGpxFile() {
+      if (!currentRouteData || !startPoint || !endPoint) {
+        alert("先にルートを計算してください");
+        return;
+      }
+
+      const coords = currentRouteData.geometry.coordinates;
+      let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="MotoFuel Planner" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>バイクツーリングルート (${startPoint.name} -> ${endPoint.name})</name>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+`;
+
+      viaPoints.forEach((v, i) => {
+        if (v.lat && v.lng) {
+          gpx += `  <wpt lat="${v.lat}" lon="${v.lng}">
+    <name>${escapeXml(v.name || `経由地 #${i+1}`)}</name>
+    <sym>Waypoint</sym>
+  </wpt>\n`;
+        }
+      });
+
+      plannedStops.forEach(gs => {
+        gpx += `  <wpt lat="${gs.lat}" lon="${gs.lng}">
+    <name>${escapeXml(gs.name)}</name>
+    <desc>給油スタンド (${gs.brand}) - ${gs.hoursText}</desc>
+    <sym>Gas Station</sym>
+  </wpt>\n`;
+      });
+
+      gpx += `  <trk>
+    <name>${escapeXml(startPoint.name)} - ${escapeXml(endPoint.name)} ${isRoundTrip ? '(往復)' : ''}</name>
+    <trkseg>\n`;
+
+      coords.forEach(c => {
+        gpx += `      <trkpt lat="${c[1]}" lon="${c[0]}"></trkpt>\n`;
+      });
+
+      gpx += `    </trkseg>
+  </trk>
+</gpx>`;
+
+      const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `moto_touring_route_${isRoundTrip ? 'roundtrip_' : ''}${Date.now()}.gpx`;
+      link.click();
+    }
+
+    function escapeXml(unsafe) {
+      return unsafe.replace(/[<>&'"]/g, c => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+        }
+      });
+    }
+
+    function formatTime(d) {
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function showLoading(text) {
+      document.getElementById('loadingText').textContent = text;
+      document.getElementById('loadingOverlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = 'toast-msg show';
+      setTimeout(() => {
+        toast.className = 'toast-msg';
+      }, 3000);
+    }
+  </script>
+  <!-- Gas Station Custom Selection Modal -->
+  <div id="gsModalOverlay" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span id="gsModalTitle">⛽ 給油スタンドの変更・名前確定</span>
+        <button class="modal-close-btn" onclick="closeGsModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Current selection banner -->
+        <div style="background:#f1f5f9; border-radius:8px; padding:10px; border:1px solid #cbd5e1;">
+          <div style="font-size:0.7rem; color:#64748b; font-weight:700;">現在設定中のスタンド:</div>
+          <div id="gsModalCurrentName" style="font-size:0.88rem; font-weight:bold; color:#1e293b; margin-top:2px;">-</div>
+          <div id="gsModalCurrentMeta" style="font-size:0.72rem; color:#475569; margin-top:2px;">-</div>
+        </div>
+
+        <!-- Manual Keyword Search Box -->
+        <div>
+          <label style="font-size:0.72rem; font-weight:700; color:#334155; margin-bottom:4px; display:block;">
+            🔍 店名・キーワードで検索して確定
+          </label>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="gsModalSearchInput" placeholder="例: ENEOS 坂出、出光 丸亀、コスモ" 
+                   style="flex:1; padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.8rem;"
+                   onkeydown="if(event.key==='Enter'&&!event.isComposing){searchGsByKeyword();}" />
+            <button type="button" onclick="searchGsByKeyword()" style="padding:6px 12px; background:var(--secondary); color:#fff; border:none; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
+              検索
+            </button>
+          </div>
+          <div id="gsModalSearchLoading" style="display:none; font-size:0.72rem; color:#64748b; margin-top:4px;">
+            スタンドを検索中...
+          </div>
+          <div id="gsModalSearchResults" style="display:flex; flex-direction:column; gap:6px; margin-top:6px; max-height:160px; overflow-y:auto;">
+            <!-- Search Results -->
+          </div>
+        </div>
+
+        <!-- Nearby Candidates List -->
+        <div>
+          <div style="font-size:0.72rem; font-weight:700; color:#334155; margin-bottom:4px; display:flex; justify-content:space-between;">
+            <span>📍 近隣の実在スタンド候補 (半径10km以内)</span>
+            <span id="gsModalCandCount" style="color:#64748b;">-</span>
+          </div>
+          <div id="gsModalCandidatesList" style="display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto;">
+            <!-- Nearby Candidates -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
