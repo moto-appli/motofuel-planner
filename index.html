@@ -3778,6 +3778,11 @@
             <span>📍 累積: ${m.distanceKm}km</span>
             <span>回り道: 約${gs.detourKm}km</span>
           </div>
+          <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gs.name + ' ' + gs.lat + ',' + gs.lng)}" target="_blank" rel="noopener" style="font-size:0.68rem; color:#1a73e8; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+              <span>🗺️</span> このスタンドをGoogleマップでピンポイント確認 ↗
+            </a>
+          </div>
         </div>
       `;
       container.appendChild(node);
@@ -4066,11 +4071,21 @@
 
       const gsStops = plannedStops.map(gs => {
         const idx = getRouteCoordIndex(gs.lat, gs.lng, 0, coords.length - 1);
+        const roadLat = coords[idx][1];
+        const roadLng = coords[idx][0];
+
+        // 敷地奥や裏路地への誤吸着を防ぐため、表の主要道路(ルート線)側の進入路座標(道路寄り80%)を算出
+        // これによりGoogleマップが裏の細い路地や民家の前を通ってしまう「でたらめな場所ずれ」を完全防止！
+        const entranceLat = parseFloat((roadLat * 0.8 + gs.lat * 0.2).toFixed(5));
+        const entranceLng = parseFloat((roadLng * 0.8 + gs.lng * 0.2).toFixed(5));
+
         return {
           type: 'gs',
           name: `⛽ ${gs.name}`,
-          lat: gs.lat,
-          lng: gs.lng,
+          lat: entranceLat,
+          lng: entranceLng,
+          rawGsLat: gs.lat,
+          rawGsLng: gs.lng,
           coordIndex: idx
         };
       });
