@@ -4198,7 +4198,7 @@
               予定到着: <b>${formatTime(m.eta)}</b><br>
               回り道ロス: 約 ${gs.detourKm} km<br>
               ブランド: <b>${gs.brand}</b><br>
-              <a href="https://www.google.com/maps/search/?api=1&query=${gs.lat},${gs.lng}" target="_blank" style="color:#1a73e8; font-weight:bold;">Googleマップで詳細を見る</a>
+              <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gs.googleSearchQuery || (gs.name + ' ガソリンスタンド'))}" target="_blank" style="color:#1a73e8; font-weight:bold;">Googleマップで店舗詳細を見る ↗</a>
             </div>
           `);
         gasStationMarkers.push(gsMarker);
@@ -4274,9 +4274,13 @@
 
               // 実在する店名。未設定ならブランド名+方面
               const displayName = rawName ? rawName : `${brand} (${serviceText})`;
+              const realStoreName = el.tags.name || rawName || "";
+              const googleSearchQuery = realStoreName ? realStoreName : `${brand} ガソリンスタンド`;
 
               const cand = {
                 name: displayName,
+                realStoreName: realStoreName,
+                googleSearchQuery: googleSearchQuery,
                 brand,
                 serviceText,
                 isSelf,
@@ -4359,6 +4363,8 @@
 
       return {
         name: `${chosenBrand} (${serviceText}) ルート給油所`,
+        realStoreName: `${chosenBrand} ガソリンスタンド`,
+        googleSearchQuery: `${chosenBrand} ガソリンスタンド`,
         brand: chosenBrand,
         serviceText,
         isSelf,
@@ -4466,8 +4472,8 @@
             <span>回り道: 約${gs.detourKm}km</span>
           </div>
           <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gs.name + ' ' + gs.lat + ',' + gs.lng)}" target="_blank" rel="noopener" style="font-size:0.68rem; color:#1a73e8; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
-              <span>🗺️</span> このスタンドをGoogleマップでピンポイント確認 ↗
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gs.googleSearchQuery || (gs.name + ' ガソリンスタンド'))}" target="_blank" rel="noopener" style="font-size:0.68rem; color:#1a73e8; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+              <span>🗺️</span> このスタンドをGoogleマップで店舗確認 ↗
             </a>
           </div>
         </div>
@@ -4561,7 +4567,7 @@
             <b>⛽ ${escapeXml(chosenGs.name)}</b><br>
             <span style="color:#e05300; font-weight:bold;">第${stopNum}給油 (カスタム確定済)</span><br>
             ブランド: <b>${escapeXml(chosenGs.brand)}</b><br>
-            <a href="https://www.google.com/maps/search/?api=1&query=${chosenGs.lat},${chosenGs.lng}" target="_blank" style="color:#1a73e8; font-weight:bold;">Googleマップで詳細を見る</a>
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(chosenGs.googleSearchQuery || (chosenGs.name + ' ガソリンスタンド'))}" target="_blank" style="color:#1a73e8; font-weight:bold;">Googleマップで店舗詳細を見る ↗</a>
           </div>
         `);
       }
@@ -4761,9 +4767,10 @@
         const roadLat = coords[idx][1];
         const roadLng = coords[idx][0];
 
-        // 【超重要】Googleマップが裏路地や敷地裏の生活道路・あぜ道に誤吸着するのを100%防ぐため、
-        // 経由地ピンは「ルート本線の道路上(roadLat, roadLng)」そのものに完全固定！
-        // これにより国道や大通りを確実に走行しつつ、スタンドの真横・入り口の目の前を経由します。
+        // Googleマップに「店舗名」で正確に認識させるための検索クエリを生成！
+        // 実在店舗名（例: "ENEOS 屋島SS"）があればそれを最優先し、Googleマップ上で公式GSピンとしてヒットさせる
+        const gQuery = gs.googleSearchQuery || gs.realStoreName || (gs.name ? gs.name.replace('⛽ ', '') : 'ガソリンスタンド');
+
         return {
           type: 'gs',
           name: `⛽ ${gs.name}`,
@@ -4771,6 +4778,7 @@
           lng: parseFloat(roadLng.toFixed(5)),
           rawGsLat: gs.lat,
           rawGsLng: gs.lng,
+          googleSearchQuery: gQuery,
           coordIndex: idx
         };
       });
@@ -4796,8 +4804,17 @@
       // Google Maps URL limit: max 10 total stops (origin + destination + 8 intermediates)
       const MAX_INTERMEDIATE_PER_LEG = 8; // 8 intermediates = 10 total stops per leg
 
+      // Googleマップに渡す地点パラメータ（GSは店舗名、地点は座標）
+      function getStopGmapsParam(s) {
+        if (s.type === 'gs' && s.googleSearchQuery) {
+          // 店舗名で渡すことで、Googleマップ上でガソリンスタンドのプレイスピンとして確実にヒットさせる！
+          return s.googleSearchQuery;
+        }
+        return `${s.lat},${s.lng}`;
+      }
+
       // Build a Google Maps URL:
-      // 公式APIディープリンク(travelmode=driving)を標準採用し、徒歩やフェリーへの勝手な切り替えを100%根絶！
+      // 公式APIディープリンク(travelmode=driving)を標準採用し、GSは店舗名でズバリ反映！
       function buildLegUrl(origin, waypoints, destination) {
         const params = new URLSearchParams();
         params.set('api', '1');
@@ -4806,7 +4823,8 @@
         params.set('travelmode', 'driving'); // 車・バイクの運転モードを100%強制！(徒歩固定やフェリー誤誘導を完全防止)
 
         if (waypoints && waypoints.length > 0) {
-          const wpStr = waypoints.map(w => `${w.lat},${w.lng}`).join('|');
+          // ガソリンスタンドは店舗名で渡すことで、Googleマップが「公式GS店舗」として認識して経由地に登録！
+          const wpStr = waypoints.map(w => getStopGmapsParam(w)).join('|');
           params.set('waypoints', wpStr);
         }
 
@@ -4820,7 +4838,7 @@
       // WebブラウザでA, B, Cピン一覧として見たい場合のSlash URL (data=!4m2!4m1!3e0で車モード強制)
       function buildWebSlashUrl(origin, waypoints, destination) {
         const allStops = [origin, ...waypoints, destination];
-        const path = allStops.map(s => `${s.lat},${s.lng}`).join('/');
+        const path = allStops.map(s => encodeURIComponent(getStopGmapsParam(s))).join('/');
         let url = `https://www.google.com/maps/dir/${path}/`;
         if (highwayAvoidMode === 'avoid') {
           url += 'data=!4m4!4m3!1m0!1m0!3e0!2m2!1b1!2b1';
