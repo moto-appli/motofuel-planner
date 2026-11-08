@@ -4233,6 +4233,52 @@
       }
     }
 
+    // Googleマップ上で「もしかして」を出さず、その場所のガソリンスタンドを一発特定するための高精度クエリ生成
+    // 例: 「香川県観音寺市吉岡町 ENEOS」のように、スタンドの住所（都道府県・市区町村・町名）を結合！
+    async function getGsPreciseLocationQuery(lat, lng, brand, rawName) {
+      let addressPart = "";
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(url, { headers: { 'Accept-Language': 'ja' }, signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.address) {
+            const a = data.address;
+            const province = a.province || a.state || "";
+            const city = a.city || a.town || a.village || a.county || "";
+            const suburb = a.suburb || a.quarter || a.neighbourhood || "";
+            addressPart = `${province}${city}${suburb}`.trim();
+          }
+        }
+      } catch (e) {
+        console.warn("Reverse geocode for GS query timed out", e);
+      }
+
+      const brandClean = brand || "ガソリンスタンド";
+      const nameClean = rawName || "";
+
+      // 住所が取得できた場合: 「香川県観音寺市吉岡町 ENEOS」のように地域名＋ブランドを合成してGoogleマップに一発特定させる
+      if (addressPart) {
+        if (nameClean && !nameClean.includes(brandClean)) {
+          return `${addressPart} ${brandClean} ${nameClean}`;
+        } else if (nameClean && nameClean.length > 3) {
+          return `${addressPart} ${nameClean}`;
+        } else {
+          return `${addressPart} ${brandClean}`;
+        }
+      }
+
+      // 住所が取れなかった場合は、Googleマップが「もしかして」で迷走しないよう
+      // 正確な店名があればそれを使い、なければ確実な緯度経度(ピン)を返す
+      if (nameClean && nameClean.length > 3 && !nameClean.includes("ガソリンスタンド")) {
+        return nameClean;
+      }
+      return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    }
+
     async function findGasStationNearWithHours(lat, lng, distKm, stopNum, etaDate) {
       const etaHour = etaDate.getHours() + etaDate.getMinutes() / 60;
       const brandFilter = document.getElementById('filterGsBrand')?.value || 'all';
@@ -4275,12 +4321,11 @@
               // 実在する店名。未設定ならブランド名+方面
               const displayName = rawName ? rawName : `${brand} (${serviceText})`;
               const realStoreName = el.tags.name || rawName || "";
-              const googleSearchQuery = realStoreName ? realStoreName : `${brand} ガソリンスタンド`;
 
               const cand = {
                 name: displayName,
                 realStoreName: realStoreName,
-                googleSearchQuery: googleSearchQuery,
+                googleSearchQuery: "", // 下で住所結合して確定
                 brand,
                 serviceText,
                 isSelf,
@@ -4316,6 +4361,9 @@
             const picked = bestMatch || brandMatch || anyOpenMatch || nearbyCandidates[0];
             if (picked) {
               picked.nearbyCandidates = nearbyCandidates;
+              // 【超重要】Googleマップが「ENEOS ガソリンスタンド」で迷子になるのを防ぐため、
+              // 住所（市町村・町名）を取得して「香川県観音寺市吉岡町 ENEOS」のように結合して一発特定させる！
+              picked.googleSearchQuery = await getGsPreciseLocationQuery(picked.lat, picked.lng, picked.brand, picked.realStoreName);
               return picked;
             }
           }
@@ -4361,10 +4409,13 @@
         hoursText = "24時間営業";
       }
 
+      // フォールバック時も住所を取得してGoogleマップでズバリ特定させる
+      const fallbackQuery = await getGsPreciseLocationQuery(lat, lng, chosenBrand, "");
+
       return {
         name: `${chosenBrand} (${serviceText}) ルート給油所`,
         realStoreName: `${chosenBrand} ガソリンスタンド`,
-        googleSearchQuery: `${chosenBrand} ガソリンスタンド`,
+        googleSearchQuery: fallbackQuery,
         brand: chosenBrand,
         serviceText,
         isSelf,
@@ -4545,6 +4596,7 @@
       if (idx < 0 || idx >= plannedStops.length) return;
 
       const oldCand = plannedStops[idx].nearbyCandidates || [];
+      const updatedQuery = chosenGs.googleSearchQuery || (chosenGs.realStoreName ? chosenGs.realStoreName : `${chosenGs.name}`);
       plannedStops[idx] = {
         ...plannedStops[idx],
         name: chosenGs.name,
@@ -4557,6 +4609,7 @@
         hoursText: chosenGs.hoursText || "営業時間確認推奨",
         isOpen: true,
         is24h: chosenGs.is24h ?? false,
+        googleSearchQuery: updatedQuery,
         nearbyCandidates: oldCand
       };
 
