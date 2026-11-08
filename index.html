@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>MotoFuel Planner - バイクツーリング給油計画＆ルート作成</title>
+  <meta name="description" content="バイクツーリング専用の無料給油計画＆ルート作成アプリ。愛車のタンク容量と実燃費から給油タイミングを自動逆算し、ルート沿いの営業中ガソリンスタンドを自動選定！そのままGoogleマップナビへ一発連携できます。">
+  
+  <!-- Open Graph / X (Twitter) Card for Social Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://yuito98725-prog.github.io/motofuel-planner/">
+  <meta property="og:title" content="MotoFuel Planner - バイクツーリング給油計画＆ルート作成">
+  <meta property="og:description" content="航続距離と実燃費から通り道の営業中スタンドを自動選定！Googleマップナビに一発連携できるバイク専用ルート作成アプリ。">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MotoFuel Planner - バイクツーリング給油計画＆ルート作成">
+  <meta name="twitter:description" content="航続距離と実燃費から通り道の営業中スタンドを自動選定！Googleマップナビに一発連携できるバイク専用ルート作成アプリ。">
+  
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MotoFuel">
@@ -1593,6 +1604,154 @@
         font-size: 0.68rem;
       }
     }
+
+    /* Beginner Quick Guide Banner */
+    .beginner-guide-card {
+      background: linear-gradient(135deg, #fff7ed, #ffedd5);
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 2px;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      animation: modalFadeIn 0.25s ease-out;
+    }
+    .guide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .guide-badge {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #c2410c;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-guide-close {
+      background: none;
+      border: none;
+      color: #9a3412;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .guide-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .guide-step-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.73rem;
+      color: #7c2d12;
+      font-weight: 600;
+    }
+    .step-num {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ea580c;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Social Share Buttons */
+    .social-share-box {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .social-share-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .social-share-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .btn-share-x {
+      flex: 1;
+      min-width: 90px;
+      background: #000000;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-share-x:hover {
+      opacity: 0.85;
+    }
+    .btn-share-line {
+      flex: 1;
+      min-width: 90px;
+      background: #06c755;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-share-line:hover {
+      opacity: 0.85;
+    }
+    .btn-share-copy {
+      flex: 1.2;
+      min-width: 120px;
+      background: #ffffff;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-share-copy:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
     /* Gas Station Selection Modal */
     .modal-overlay {
       position: fixed;
@@ -1744,6 +1903,28 @@
     </div>
 
     <div class="sidebar-content">
+
+      <!-- Quick Beginner Guide Banner -->
+      <div id="beginnerGuideBanner" class="beginner-guide-card">
+        <div class="guide-header">
+          <span class="guide-badge">🔰 かんたん3ステップで給油計画</span>
+          <button type="button" class="btn-guide-close" onclick="closeBeginnerGuide()" title="この案内を閉じる">✕</button>
+        </div>
+        <div class="guide-steps">
+          <div class="guide-step-item">
+            <span class="step-num">1</span>
+            <span>出発地・目的地をタップ（または検索入力）</span>
+          </div>
+          <div class="guide-step-item">
+            <span class="step-num">2</span>
+            <span>愛車のタンク容量・燃費を選択</span>
+          </div>
+          <div class="guide-step-item">
+            <span class="step-num">3</span>
+            <span>「計算」➜ 営業中GS入りでGoogleマップに即連携！</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Saved My Routes Card (Replaces fixed presets) -->
       <div class="card" id="savedRoutesCard">
@@ -2077,6 +2258,26 @@
         <button class="btn-save-current-route" onclick="saveCurrentRoute()">
           <span>💾</span> このルートをマイルートに保存する
         </button>
+
+        <!-- Social Share Box -->
+        <div class="social-share-box">
+          <div class="social-share-title">
+            <span>📢</span>
+            <span>ツーリング計画を仲間にシェア</span>
+          </div>
+          <div class="social-share-row">
+            <button type="button" class="btn-share-x" onclick="shareOnX()">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              <span>𝕏 でポスト</span>
+            </button>
+            <button type="button" class="btn-share-line" onclick="shareOnLine()">
+              <span>💬 LINEで送る</span>
+            </button>
+            <button type="button" class="btn-share-copy" onclick="copyShareableRouteUrl()">
+              <span>🔗 ルート共有URLコピー</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Gas Station Plan Section -->
@@ -2279,7 +2480,209 @@
       initMobileView();
       initResizer();
       initMapTipAutoHide();
+      checkBeginnerGuideVisibility();
+      restoreRouteFromUrlParams();
     });
+
+    // ==========================================
+    // Beginner Guide Management
+    // ==========================================
+    function closeBeginnerGuide() {
+      const banner = document.getElementById('beginnerGuideBanner');
+      if (banner) {
+        banner.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-10px)';
+        setTimeout(() => banner.style.display = 'none', 200);
+      }
+      try {
+        localStorage.setItem('moto_hide_guide', 'true');
+      } catch (e) {}
+    }
+
+    function checkBeginnerGuideVisibility() {
+      try {
+        if (localStorage.getItem('moto_hide_guide') === 'true') {
+          const banner = document.getElementById('beginnerGuideBanner');
+          if (banner) banner.style.display = 'none';
+        }
+      } catch (e) {}
+    }
+
+    // ==========================================
+    // Social Sharing & Deep-linking Engine
+    // ==========================================
+    function generateShareableRouteUrl() {
+      if (!startPoint || !endPoint) return window.location.href.split('?')[0];
+
+      const params = new URLSearchParams();
+      params.set('s_name', startPoint.name || '出発地');
+      params.set('s_lat', startPoint.lat);
+      params.set('s_lng', startPoint.lng);
+
+      params.set('e_name', endPoint.name || '目的地');
+      params.set('e_lat', endPoint.lat);
+      params.set('e_lng', endPoint.lng);
+
+      params.set('round', isRoundTrip ? '1' : '0');
+      params.set('fuel', isFuelPlanEnabled ? '1' : '0');
+      params.set('hw', highwayAvoidMode);
+
+      const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null);
+      if (validVias.length > 0) {
+        const viasStr = validVias.map(v => `${encodeURIComponent(v.name || '経由地')}:${v.lat}:${v.lng}`).join('|');
+        params.set('vias', viasStr);
+      }
+
+      const tank = document.getElementById('tankCapacity')?.value || '14';
+      const km = document.getElementById('fuelEconomy')?.value || '22';
+      params.set('tank', tank);
+      params.set('km', km);
+
+      const base = window.location.origin + window.location.pathname;
+      return `${base}?${params.toString()}`;
+    }
+
+    function shareOnX() {
+      if (!startPoint || !endPoint) {
+        alert("先にルートを計算してください 🏍️");
+        return;
+      }
+      const shareUrl = generateShareableRouteUrl();
+      const dist = document.getElementById('routeTotalDist')?.textContent || '';
+      const fuelCount = document.getElementById('routeFuelStopsCount')?.textContent || '';
+      const isRound = isRoundTrip ? '⇄' : '➜';
+
+      let text = `🏍️ ツーリング給油計画を作成しました！\n`;
+      text += `【${startPoint.name} ${isRound} ${endPoint.name} (${dist})】\n`;
+      if (isFuelPlanEnabled && fuelCount) {
+        text += `⛽ 給油計画: ${fuelCount}\n`;
+      }
+      text += `通り道の営業中スタンド入りでGoogleマップに即ナビ連携できるバイク専用ツール！\n`;
+      text += `#MotoFuel #ツーリング #バイク乗りと繋がりたい\n`;
+
+      const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+      window.open(xUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    function shareOnLine() {
+      if (!startPoint || !endPoint) {
+        alert("先にルートを計算してください 🏍️");
+        return;
+      }
+      const shareUrl = generateShareableRouteUrl();
+      const dist = document.getElementById('routeTotalDist')?.textContent || '';
+      const isRound = isRoundTrip ? '⇄' : '➜';
+
+      let text = `🏍️ ツーリング計画を共有します！\n`;
+      text += `【${startPoint.name} ${isRound} ${endPoint.name} (${dist})】\n`;
+      text += `Googleマップナビ＆給油計画はこちらから開けます👇\n${shareUrl}`;
+
+      const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+      window.open(lineUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    function copyShareableRouteUrl() {
+      if (!startPoint || !endPoint) {
+        alert("先にルートを計算してください 🏍️");
+        return;
+      }
+      const shareUrl = generateShareableRouteUrl();
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast("🔗 ツーリング共有リンクをコピーしました！仲間に送ってみよう 🏍️💨");
+        }).catch(() => {
+          prompt("以下のURLをコピーして仲間に共有してください:", shareUrl);
+        });
+      } else {
+        prompt("以下のURLをコピーして仲間に共有してください:", shareUrl);
+      }
+    }
+
+    function restoreRouteFromUrlParams() {
+      const search = window.location.search;
+      if (!search) return;
+
+      try {
+        const params = new URLSearchParams(search);
+        const sLat = parseFloat(params.get('s_lat'));
+        const sLng = parseFloat(params.get('s_lng'));
+        const sName = params.get('s_name') || '出発地';
+
+        const eLat = parseFloat(params.get('e_lat'));
+        const eLng = parseFloat(params.get('e_lng'));
+        const eName = params.get('e_name') || '目的地';
+
+        if (isNaN(sLat) || isNaN(sLng) || isNaN(eLat) || isNaN(eLng)) return;
+
+        // Restore start and end
+        setStartPoint(sLat, sLng, sName);
+        setEndPoint(eLat, eLng, eName);
+
+        // Restore roundtrip
+        if (params.has('round')) {
+          const isRound = params.get('round') === '1';
+          const chk = document.getElementById('checkRoundTrip');
+          if (chk) {
+            chk.checked = isRound;
+            onRoundTripToggle();
+          }
+        }
+
+        // Restore fuel mode
+        if (params.has('fuel')) {
+          const isFuel = params.get('fuel') === '1';
+          setFuelPlanMode(isFuel);
+        }
+
+        // Restore highway mode
+        if (params.has('hw')) {
+          const hw = params.get('hw');
+          const sel = document.getElementById('selectHighwayMode');
+          if (sel) {
+            sel.value = hw;
+            onHighwayModeChange();
+          }
+        }
+
+        // Restore bike specs
+        if (params.has('tank')) {
+          const tankEl = document.getElementById('tankCapacity');
+          if (tankEl) tankEl.value = params.get('tank');
+        }
+        if (params.has('km')) {
+          const kmEl = document.getElementById('fuelEconomy');
+          if (kmEl) kmEl.value = params.get('km');
+        }
+
+        // Restore vias
+        if (params.has('vias')) {
+          const viasRaw = params.get('vias').split('|');
+          viasRaw.forEach(vStr => {
+            const parts = vStr.split(':');
+            if (parts.length >= 3) {
+              const vName = decodeURIComponent(parts[0]);
+              const vLat = parseFloat(parts[1]);
+              const vLng = parseFloat(parts[2]);
+              if (!isNaN(vLat) && !isNaN(vLng)) {
+                addViaPoint(vLat, vLng, vName);
+              }
+            }
+          });
+        }
+
+        updateFuelCalculations();
+
+        // 自動でルート計算を実行！
+        setTimeout(() => {
+          calculateRouteAndFuelPlan();
+          showToast("🔗 共有されたツーリングルートを復元しました！🏍️");
+        }, 500);
+
+      } catch (err) {
+        console.warn("Failed to restore route from URL params", err);
+      }
+    }
 
     // ==========================================
     // Mobile View & Touch Tab Controller
