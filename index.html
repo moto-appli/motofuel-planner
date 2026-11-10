@@ -1308,12 +1308,13 @@
       top: 12px;
       left: 12px;
       right: 12px;
-      z-index: 1100;
+      z-index: 3500 !important;
+      pointer-events: auto !important;
       background: #ea580c;
       color: #ffffff;
       padding: 10px 14px;
       border-radius: 10px;
-      box-shadow: 0 4px 18px rgba(234, 88, 12, 0.4);
+      box-shadow: 0 4px 18px rgba(234, 88, 12, 0.45);
       display: none;
       align-items: center;
       justify-content: space-between;
@@ -1329,46 +1330,60 @@
       background: #ffffff;
       border: none;
       color: #ea580c;
-      font-size: 0.75rem;
-      padding: 5px 12px;
+      font-size: 0.8rem;
+      padding: 6px 14px;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 800;
       flex-shrink: 0;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      pointer-events: auto !important;
+      z-index: 3600 !important;
     }
     .route-edit-banner .btn-done-edit:hover {
       background: #fff7ed;
     }
     .btn-route-swipe-mode {
       position: absolute;
-      top: 130px;
+      top: 75px;
       right: 12px;
-      z-index: 900;
+      z-index: 3000 !important;
+      pointer-events: auto !important;
       background: #ffffff;
       border: 2px solid #ea580c;
       color: #ea580c;
-      padding: 7px 13px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 22px;
+      font-size: 0.82rem;
+      font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 3px 12px rgba(234, 88, 12, 0.25);
+      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
       display: none;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       transition: all 0.15s;
       touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .btn-route-swipe-mode:hover {
+      background: #fff7ed;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(234, 88, 12, 0.45);
     }
     .btn-route-swipe-mode:active {
-      transform: scale(0.96);
+      transform: scale(0.95);
     }
     .btn-route-swipe-mode.active {
-      background: #ea580c;
+      background: #16a34a;
       color: #ffffff;
-      border-color: #c2410c;
-      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.35);
-      animation: pulseGlow 1.6s infinite;
+      border-color: #15803d;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.35);
+      animation: pulseGlowGreen 1.6s infinite;
+    }
+    @keyframes pulseGlowGreen {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.12); }
     }
     @keyframes pulseGlow {
       0%, 100% { box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.35); }
@@ -2117,12 +2132,12 @@
               <span>🛣️</span> 高速・有料道路
             </label>
             <select id="selectHighwayMode" class="filter-select" onchange="onHighwayModeChange()" style="font-size: 0.76rem; padding: 3px 8px;">
-              <option value="allow">高速・有料道路を利用 (標準)</option>
-              <option value="avoid">下道優先 (高速・有料道路を使わない)</option>
+              <option value="avoid" selected>下道優先 (高速・有料道路を使わない / デフォルト)</option>
+              <option value="allow">高速・有料道路を利用</option>
             </select>
           </div>
           <div style="font-size: 0.65rem; color: var(--gray-600); margin-top: 3px; line-height: 1.3;">
-            ※「下道優先」にするとGoogleマップも自動的に有料道路回避でナビ開始します（原付二種・ツーリング向け）
+            ※ デフォルトは「下道優先」です。Googleマップ連携時も有料道路回避でナビ開始します（原付二種・下道ツーリング向け）
           </div>
         </div>
 
@@ -2379,8 +2394,8 @@
         </div>
 
         <!-- Swipe Route Edit Button inside summary -->
-        <button type="button" class="btn-save-current-route" onclick="toggleRouteEditMode(true)" style="background:#fff7ed; border-color:#ea580c; color:#c2410c; margin-top:6px;">
-          <span>🖐️</span> <span>スワイプでルートを修正する</span>
+        <button type="button" id="btnRouteEditSidebar" class="btn-save-current-route" onclick="toggleRouteEditMode()" style="background:#fff7ed; border-color:#ea580c; color:#c2410c; margin-top:6px; font-weight:700;">
+          <span>🖐️</span> <span>ルートをスワイプ修正する</span>
         </button>
 
         <!-- Quick Save Button inside summary -->
@@ -3192,6 +3207,40 @@
       }).addTo(map);
 
       map.on('click', handleMapClick);
+
+      // 【超重要】Leafletコンテナ内のUI要素（ボタン・バナー）のクリック・タッチ伝播を確実に無効化
+      // これを行わないとLeafletがイベントを吸い取ってしまい、地図上のボタンクリック・タップが一切効かなくなる
+      const mapOverlayControls = [
+        document.getElementById('btnRouteEditMode'),
+        document.getElementById('routeEditModeBanner'),
+        document.querySelector('.btn-gps-locate'),
+        document.querySelector('.mobile-map-calc-btn'),
+        document.querySelector('.pin-drop-active-bar'),
+        document.querySelector('.map-overlay-tip')
+      ];
+      mapOverlayControls.forEach(el => {
+        if (el && typeof L !== 'undefined' && L.DomEvent) {
+          L.DomEvent.disableClickPropagation(el);
+          L.DomEvent.disableScrollPropagation(el);
+        }
+      });
+
+      // スワイプ修正ボタン専用の直接イベントリスナー設定（click / touchend / pointerdown）
+      const btnSwipe = document.getElementById('btnRouteEditMode');
+      if (btnSwipe) {
+        L.DomEvent.disableClickPropagation(btnSwipe);
+        L.DomEvent.disableScrollPropagation(btnSwipe);
+        btnSwipe.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          toggleRouteEditMode();
+        });
+        btnSwipe.addEventListener('touchend', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          toggleRouteEditMode();
+        });
+      }
     }
 
     // ==========================================
@@ -3287,7 +3336,7 @@
         timeVal: document.getElementById('timeInput').value,
         breakTime: document.getElementById('checkBreakTime').checked,
         bikePreset: document.getElementById('bikePresetSelect')?.value || 'custom',
-        highwayMode: document.getElementById('selectHighwayMode')?.value || 'allow',
+        highwayMode: document.getElementById('selectHighwayMode')?.value || 'avoid',
         filterGsBrand: document.getElementById('filterGsBrand')?.value || 'all',
         filterGsService: document.getElementById('filterGsService')?.value || 'all',
         totalDistKm: totalDist,
@@ -3364,7 +3413,7 @@
     // Focus, Pin Drop & Highway Mode Management
     // ==========================================
     let currentInputMode = 'pin'; // 'pin' (default) | 'text'
-    let highwayAvoidMode = 'allow'; // 'allow' | 'avoid'
+    let highwayAvoidMode = 'avoid'; // 'avoid' (デフォルト下道優先) | 'allow'
     let isFuelPlanEnabled = true; // 給油計画の有無 (true: 給油あり, false: ルートのみ)
 
     function setFuelPlanMode(enabled) {
@@ -3474,12 +3523,12 @@
 
     function onHighwayModeChange() {
       const sel = document.getElementById('selectHighwayMode');
-      highwayAvoidMode = sel ? sel.value : 'allow';
+      highwayAvoidMode = sel ? sel.value : 'avoid';
 
       if (currentRouteData) {
         calculateRouteAndFuelPlan();
       } else {
-        showToast(highwayAvoidMode === 'avoid' ? "🛣️ 下道優先（有料道路なし）に設定しました" : "🛣️ 高速・有料道路を利用に設定しました");
+        showToast(highwayAvoidMode === 'avoid' ? "🛣️ 下道優先（有料道路なし / デフォルト）に設定しました" : "🛣️ 高速・有料道路を利用に設定しました");
       }
     }
 
@@ -3990,22 +4039,50 @@
 
       isRouteEditModeActive = (forceState !== null) ? forceState : !isRouteEditModeActive;
       const btn = document.getElementById('btnRouteEditMode');
+      const sidebarBtn = document.getElementById('btnRouteEditSidebar');
       const banner = document.getElementById('routeEditModeBanner');
 
       if (isRouteEditModeActive) {
+        // 地図上フローティングボタンのアクティブ表示
         if (btn) {
           btn.classList.add('active');
           btn.innerHTML = `<span class="icon">✓</span> <span class="label">修正完了</span>`;
+          btn.style.display = 'inline-flex';
+        }
+        // サイドバーボタンのアクティブ表示
+        if (sidebarBtn) {
+          sidebarBtn.classList.add('active');
+          sidebarBtn.innerHTML = `<span>✓</span> <span>修正完了（確定）</span>`;
+          sidebarBtn.style.background = '#16a34a';
+          sidebarBtn.style.borderColor = '#15803d';
+          sidebarBtn.style.color = '#ffffff';
         }
         if (banner) banner.classList.add('active');
         if (routePolyline) {
-          routePolyline.setStyle({ color: '#ea580c', weight: 11, opacity: 0.95 });
+          // スワイプしやすいようにオレンジ色の太線に変化
+          routePolyline.setStyle({ color: '#ea580c', weight: 14, opacity: 0.95 });
         }
-        showToast("🖐️ スワイプ修正モード開始！ルートを指でなぞってお好みの道へ引っ張ってください");
+
+        // スマホ画面でプランタブや設定タブが表示されている場合は、地図をすぐに操作できるよう地図タブに切り替え
+        if (window.innerWidth <= 820) {
+          switchMobileTab('map');
+        }
+
+        showToast("🖐️ スワイプ修正モード開始！オレンジ色のルート線を指で引っ張って走りたい道へ曲げてください");
       } else {
+        // 地図上フローティングボタンの通常表示
         if (btn) {
           btn.classList.remove('active');
           btn.innerHTML = `<span class="icon">🖐️</span> <span class="label">スワイプ修正</span>`;
+          btn.style.display = 'inline-flex';
+        }
+        // サイドバーボタンの通常表示
+        if (sidebarBtn) {
+          sidebarBtn.classList.remove('active');
+          sidebarBtn.innerHTML = `<span>🖐️</span> <span>ルートをスワイプ修正する</span>`;
+          sidebarBtn.style.background = '#fff7ed';
+          sidebarBtn.style.borderColor = '#ea580c';
+          sidebarBtn.style.color = '#c2410c';
         }
         if (banner) banner.classList.remove('active');
         if (routePolyline) {
