@@ -1301,6 +1301,80 @@
     .pin-mode-banner .btn-cancel-pin:hover {
       background: rgba(255, 255, 255, 0.35);
     }
+
+    /* Route Swipe Edit Mode Banner & Floating Button */
+    .route-edit-banner {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1100;
+      background: #ea580c;
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      box-shadow: 0 4px 18px rgba(234, 88, 12, 0.4);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    .route-edit-banner.active {
+      display: flex;
+    }
+    .route-edit-banner .btn-done-edit {
+      background: #ffffff;
+      border: none;
+      color: #ea580c;
+      font-size: 0.75rem;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 800;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .route-edit-banner .btn-done-edit:hover {
+      background: #fff7ed;
+    }
+    .btn-route-swipe-mode {
+      position: absolute;
+      top: 130px;
+      right: 12px;
+      z-index: 900;
+      background: #ffffff;
+      border: 2px solid #ea580c;
+      color: #ea580c;
+      padding: 7px 13px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 3px 12px rgba(234, 88, 12, 0.25);
+      display: none;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-route-swipe-mode:active {
+      transform: scale(0.96);
+    }
+    .btn-route-swipe-mode.active {
+      background: #ea580c;
+      color: #ffffff;
+      border-color: #c2410c;
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.35);
+      animation: pulseGlow 1.6s infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.35); }
+      50% { box-shadow: 0 0 0 8px rgba(234, 88, 12, 0.1); }
+    }
+
     .input-mode-switch {
       display: flex;
       background: #e2e8f0;
@@ -1953,10 +2027,10 @@
 
         <!-- Input Mode Switcher (Text Search vs Map Pin Drop) -->
         <div class="input-mode-switch">
-          <button type="button" class="input-mode-btn active" id="btnModeText" onclick="setInputMode('text')">
+          <button type="button" class="input-mode-btn" id="btnModeText" onclick="setInputMode('text')">
             <span>📝</span> 文字入力・地名検索
           </button>
-          <button type="button" class="input-mode-btn" id="btnModePin" onclick="setInputMode('pin')">
+          <button type="button" class="input-mode-btn active" id="btnModePin" onclick="setInputMode('pin')">
             <span>📍</span> 地図ピン直接指定 (キーボードなし)
           </button>
         </div>
@@ -2304,6 +2378,11 @@
           <span id="schedEndText">帰着: 18:30</span>
         </div>
 
+        <!-- Swipe Route Edit Button inside summary -->
+        <button type="button" class="btn-save-current-route" onclick="toggleRouteEditMode(true)" style="background:#fff7ed; border-color:#ea580c; color:#c2410c; margin-top:6px;">
+          <span>🖐️</span> <span>スワイプでルートを修正する</span>
+        </button>
+
         <!-- Quick Save Button inside summary -->
         <button class="btn-save-current-route" onclick="saveCurrentRoute()">
           <span>💾</span> このルートをマイルートに保存する
@@ -2407,6 +2486,15 @@
       <button type="button" class="btn-cancel-pin" onclick="cancelPinDropMode()">✕ 終了</button>
     </div>
 
+    <!-- Route Swipe Edit Mode Banner -->
+    <div id="routeEditModeBanner" class="route-edit-banner">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:1.1rem;">🖐️</span>
+        <span id="routeEditModeBannerText">スワイプ修正中: ルートを指でなぞって走りたい道へ引っ張ってください</span>
+      </div>
+      <button type="button" class="btn-done-edit" onclick="toggleRouteEditMode()">✓ 完了</button>
+    </div>
+
     <div class="map-overlay-tip">
       <span>👆</span>
       <span id="mapTipText">ピンをドラッグして位置微調整、または地図クリックで設定できます</span>
@@ -2415,6 +2503,12 @@
     <!-- GPS Locate Button -->
     <button class="btn-gps-locate" onclick="locateUserPosition()" title="現在地を取得して出発地に設定">
       <span>📍</span>
+    </button>
+
+    <!-- Swipe Route Edit Floating Button -->
+    <button id="btnRouteEditMode" class="btn-route-swipe-mode" onclick="toggleRouteEditMode()" style="display:none;" title="ルートを指でスワイプしてお好みの道へ曲げるモード">
+      <span class="icon">🖐️</span>
+      <span class="label">スワイプ修正</span>
     </button>
 
     <!-- Mobile Floating Calculate Button -->
@@ -2432,11 +2526,11 @@
 
   <!-- Mobile Bottom Navigation Bar -->
   <nav class="mobile-nav-bar">
-    <button class="mobile-tab-btn" id="mobileTabBtnMap" onclick="switchMobileTab('map')">
+    <button class="mobile-tab-btn active" id="mobileTabBtnMap" onclick="switchMobileTab('map')">
       <span class="tab-icon">🗺️</span>
       <span>地図</span>
     </button>
-    <button class="mobile-tab-btn active" id="mobileTabBtnSettings" onclick="switchMobileTab('settings')">
+    <button class="mobile-tab-btn" id="mobileTabBtnSettings" onclick="switchMobileTab('settings')">
       <span class="tab-icon">📝</span>
       <span>ルート設定</span>
     </button>
@@ -2554,6 +2648,12 @@
       initMapTipAutoHide();
       checkBeginnerGuideVisibility();
       restoreRouteFromUrlParams();
+
+      // 起動時は文字入力ではなくピン止めをデフォルトにする
+      setInputMode('pin');
+      if (!startPoint) {
+        startPinDropFor('start');
+      }
     });
 
     // ==========================================
@@ -2759,10 +2859,10 @@
     // ==========================================
     // Mobile View & Touch Tab Controller
     // ==========================================
-    let currentMobileTab = 'settings';
+    let currentMobileTab = 'map';
 
     function initMobileView() {
-      document.body.classList.add('mobile-tab-settings');
+      switchMobileTab('map');
       window.addEventListener('resize', () => {
         if (map) map.invalidateSize();
       });
@@ -3263,7 +3363,7 @@
     // ==========================================
     // Focus, Pin Drop & Highway Mode Management
     // ==========================================
-    let currentInputMode = 'text'; // 'text' | 'pin'
+    let currentInputMode = 'pin'; // 'pin' (default) | 'text'
     let highwayAvoidMode = 'allow'; // 'allow' | 'avoid'
     let isFuelPlanEnabled = true; // 給油計画の有無 (true: 給油あり, false: ルートのみ)
 
@@ -3444,27 +3544,28 @@
 
       clearRouteVisualsOnly();
 
-      // ガイダンスバナーを非表示
-      document.getElementById('pinModeBanner')?.classList.remove('active');
-
-      if (activeFocusTarget === 'start') {
+      if (activeFocusTarget === 'start' || !startPoint) {
         setStartPoint(lat, lng, coordName);
-        showToast("出発地を地図から設定しました 🟢");
-      } else if (activeFocusTarget === 'end') {
+        showToast("出発地を設定しました 🟢 続いて目的地をタップしてください");
+        startPinDropFor('end');
+      } else if (activeFocusTarget === 'end' || !endPoint) {
         setEndPoint(lat, lng, coordName);
-        showToast("目的地(折り返し)を地図から設定しました 🔴");
+        showToast("目的地を設定しました 🔴 「🚀 ルート計算」で経路を作成できます");
+        const banner = document.getElementById('pinModeBanner');
+        const text = document.getElementById('pinModeBannerText');
+        if (banner && text) {
+          text.textContent = `📍 地図タップで【経由地】を追加、または「🚀 ルート計算」をタップ`;
+          banner.classList.add('active');
+        }
+        activeFocusTarget = null;
       } else if (activeFocusTarget && activeFocusTarget.startsWith('via_')) {
         const id = parseInt(activeFocusTarget.replace('via_', ''), 10);
         updateViaPointCoords(id, lat, lng, coordName);
         showToast("経由地を地図から設定しました 🟡");
+        activeFocusTarget = null;
+        document.getElementById('pinModeBanner')?.classList.remove('active');
       } else {
-        if (!startPoint) {
-          setStartPoint(lat, lng, coordName);
-          showToast("出発地を設定しました 🟢");
-        } else if (!endPoint) {
-          setEndPoint(lat, lng, coordName);
-          showToast("目的地(折り返し)を設定しました 🔴");
-        } else if (viaPoints.length < MAX_VIA_POINTS) {
+        if (viaPoints.length < MAX_VIA_POINTS) {
           addViaPoint(lat, lng, coordName);
           showToast(`経由地 #${viaPoints.length} を追加しました 🟡`);
         } else {
@@ -3872,24 +3973,180 @@
       return newVia;
     }
 
+    // ==========================================
+    // Dedicated Route Swipe Edit Mode (スワイプ修正モード)
+    // ==========================================
+    let isRouteEditModeActive = false;
+    let isSwipingRoute = false;
+    let swipeGhostMarker = null;
+    let swipeRubberBand = null;
+    let swipeOriginLatLng = null;
+
+    function toggleRouteEditMode(forceState = null) {
+      if (!currentRouteData || !routePolyline) {
+        showToast("先にルートを計算してください 🗺️");
+        return;
+      }
+
+      isRouteEditModeActive = (forceState !== null) ? forceState : !isRouteEditModeActive;
+      const btn = document.getElementById('btnRouteEditMode');
+      const banner = document.getElementById('routeEditModeBanner');
+
+      if (isRouteEditModeActive) {
+        if (btn) {
+          btn.classList.add('active');
+          btn.innerHTML = `<span class="icon">✓</span> <span class="label">修正完了</span>`;
+        }
+        if (banner) banner.classList.add('active');
+        if (routePolyline) {
+          routePolyline.setStyle({ color: '#ea580c', weight: 11, opacity: 0.95 });
+        }
+        showToast("🖐️ スワイプ修正モード開始！ルートを指でなぞってお好みの道へ引っ張ってください");
+      } else {
+        if (btn) {
+          btn.classList.remove('active');
+          btn.innerHTML = `<span class="icon">🖐️</span> <span class="label">スワイプ修正</span>`;
+        }
+        if (banner) banner.classList.remove('active');
+        if (routePolyline) {
+          routePolyline.setStyle({ color: '#1a73e8', weight: 6, opacity: 0.85 });
+        }
+        showToast("✓ スワイプ修正モードを完了しました");
+      }
+    }
+
+    function startRouteSwipe(e) {
+      // スワイプ修正モードがONの場合にドラッグ開始
+      L.DomEvent.stopPropagation(e);
+      if (e.originalEvent && e.originalEvent.cancelable) {
+        e.originalEvent.preventDefault();
+      }
+
+      const origEvt = e.originalEvent || e;
+      const touch = (origEvt.touches && origEvt.touches.length > 0) ? origEvt.touches[0] : origEvt;
+      const latlng = e.latlng || map.mouseEventToLatLng(touch);
+      if (!latlng) return;
+
+      swipeOriginLatLng = latlng;
+      isSwipingRoute = true;
+
+      // 【超重要】スワイプ中に地図が滑って動かないよう、地図のドラッグ移動を一時ロック！
+      map.dragging.disable();
+      if (map.touchZoom) map.touchZoom.disable();
+
+      const ghostIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background:#ea580c; color:#fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 4px 14px rgba(0,0,0,0.4); border:3px solid #ffffff;">📍</div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+      });
+
+      swipeGhostMarker = L.marker(latlng, { icon: ghostIcon, zIndexOffset: 2500 }).addTo(map);
+
+      swipeRubberBand = L.polyline([[latlng.lat, latlng.lng], [latlng.lat, latlng.lng]], {
+        color: '#ea580c',
+        weight: 4,
+        dashArray: '6, 6',
+        opacity: 0.95
+      }).addTo(map);
+
+      window.addEventListener('touchmove', onRouteSwipeMove, { passive: false });
+      window.addEventListener('touchend', onRouteSwipeEnd, { passive: false });
+      window.addEventListener('mousemove', onRouteSwipeMove);
+      window.addEventListener('mouseup', onRouteSwipeEnd);
+    }
+
+    function onRouteSwipeMove(e) {
+      if (!isSwipingRoute || !swipeGhostMarker) return;
+      if (e.cancelable) e.preventDefault();
+
+      const touch = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
+      const currentLatLng = map.mouseEventToLatLng(touch);
+      if (!currentLatLng) return;
+
+      swipeGhostMarker.setLatLng(currentLatLng);
+      if (swipeRubberBand && swipeOriginLatLng) {
+        swipeRubberBand.setLatLngs([
+          [swipeOriginLatLng.lat, swipeOriginLatLng.lng],
+          [currentLatLng.lat, currentLatLng.lng]
+        ]);
+      }
+    }
+
+    function onRouteSwipeEnd(e) {
+      if (!isSwipingRoute) return;
+      isSwipingRoute = false;
+
+      window.removeEventListener('touchmove', onRouteSwipeMove);
+      window.removeEventListener('touchend', onRouteSwipeEnd);
+      window.removeEventListener('mousemove', onRouteSwipeMove);
+      window.removeEventListener('mouseup', onRouteSwipeEnd);
+
+      // 地図のドラッグ操作を再有効化
+      map.dragging.enable();
+      if (map.touchZoom) map.touchZoom.enable();
+
+      let finalLatLng = null;
+      if (swipeGhostMarker) {
+        finalLatLng = swipeGhostMarker.getLatLng();
+        map.removeLayer(swipeGhostMarker);
+        swipeGhostMarker = null;
+      }
+      if (swipeRubberBand) {
+        map.removeLayer(swipeRubberBand);
+        swipeRubberBand = null;
+      }
+
+      if (finalLatLng && swipeOriginLatLng) {
+        const distMoved = haversineDistance(swipeOriginLatLng.lat, swipeOriginLatLng.lng, finalLatLng.lat, finalLatLng.lng);
+        // 120m以上ドラッグした場合はその位置に経由地を挿入して変形
+        if (distMoved >= 120) {
+          insertViaPointOnRoute(finalLatLng.lat, finalLatLng.lng);
+        } else {
+          // 移動が小さかった場合はタップ位置に経由地ピンを追加
+          insertViaPointOnRoute(swipeOriginLatLng.lat, swipeOriginLatLng.lng);
+        }
+      }
+      swipeOriginLatLng = null;
+    }
+
     function setupRoutePolylineInteraction(polyline) {
       if (!polyline) return;
 
       // ホバー時のハイライト効果
       polyline.on('mouseover', function(e) {
-        polyline.setStyle({ color: '#ea580c', weight: 9, opacity: 0.95 });
+        if (!isRouteEditModeActive) {
+          polyline.setStyle({ color: '#ea580c', weight: 8, opacity: 0.95 });
+        }
         map.getContainer().style.cursor = 'pointer';
       });
 
       polyline.on('mouseout', function(e) {
-        polyline.setStyle({ color: '#1a73e8', weight: 6, opacity: 0.85 });
+        if (!isRouteEditModeActive) {
+          polyline.setStyle({ color: '#1a73e8', weight: 6, opacity: 0.85 });
+        }
         map.getContainer().style.cursor = '';
       });
 
-      // ルート線をクリック/タップすると、その場所に経由地を追加してドラッグ可能に！
+      // スワイプ修正モードでのタッチ・ドラッグ開始
+      polyline.on('mousedown', function(e) {
+        if (isRouteEditModeActive) {
+          startRouteSwipe(e);
+        }
+      });
+      polyline.on('touchstart', function(e) {
+        if (isRouteEditModeActive) {
+          startRouteSwipe(e);
+        }
+      });
+
+      // 通常タップでも経由地を追加可能（まだ修正モードでなくても案内を出す）
       polyline.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         const latlng = e.latlng;
+        if (!isRouteEditModeActive) {
+          toggleRouteEditMode(true);
+        }
         insertViaPointOnRoute(latlng.lat, latlng.lng);
       });
     }
@@ -3914,6 +4171,12 @@
     }
 
     function clearRouteVisualsOnly() {
+      if (isRouteEditModeActive) {
+        toggleRouteEditMode(false);
+      }
+      const btnEdit = document.getElementById('btnRouteEditMode');
+      if (btnEdit) btnEdit.style.display = 'none';
+
       if (routePolyline) {
         map.removeLayer(routePolyline);
         routePolyline = null;
@@ -4207,6 +4470,9 @@
         document.getElementById('routeTotalDist').textContent = `${totalDistKm} km`;
         document.getElementById('routeTotalDuration').textContent = durationText;
         document.getElementById('routeOverviewCard').style.display = 'block';
+
+        const btnEdit = document.getElementById('btnRouteEditMode');
+        if (btnEdit) btnEdit.style.display = 'inline-flex';
 
         await generateFuelPlanFromRoute(route, totalDurationSeconds);
 
