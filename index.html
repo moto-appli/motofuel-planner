@@ -2214,7 +2214,57 @@
             </select>
           </div>
         </div>
-        <div style="font-size: 0.68rem; color: var(--gray-600); margin-top: 5px; line-height: 1.35;">
+
+        <!-- 給油アルゴリズム詳細設定 (裏データ・エキスパートチューニング) -->
+        <div style="margin-top: 10px; border-top: 1px dashed var(--gray-300); padding-top: 8px;">
+          <button type="button" id="btnToggleAdvancedGsSettings" onclick="toggleAdvancedGsSettings()" style="background: none; border: none; padding: 2px 0; font-size: 0.73rem; font-weight: 700; color: #ea580c; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <span style="display: flex; align-items: center; gap: 5px;">
+              <span>⚙️</span>
+              <span>給油アルゴリズム詳細設定 (探索半径・手前給油)</span>
+            </span>
+            <span id="advancedGsChevron" style="font-size: 0.65rem; transition: transform 0.2s; color: #64748b;">▼</span>
+          </button>
+
+          <div id="advancedGsSettingsBox" style="display: none; margin-top: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px;">
+            <div style="margin-bottom: 8px;">
+              <label class="filter-label" for="settingGsRadius" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>① スタンド探索許容半径</span>
+                <span style="font-size: 0.65rem; color: #64748b;">(直線探索レンジ)</span>
+              </label>
+              <select id="settingGsRadius" class="filter-select" onchange="onAdvancedGsSettingChange()" style="font-size: 0.74rem; padding: 5px 8px; border-color: #cbd5e1;">
+                <option value="3000">3 km (ルート直近・最小寄り道)</option>
+                <option value="5000">5 km (標準バランス)</option>
+                <option value="10000" selected>10 km (広域・山間部向け / プリセット初期値)</option>
+                <option value="15000">15 km (超広域・過疎地・深夜)</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom: 8px;">
+              <label class="filter-label" for="settingGsTimingStrategy" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>② 給油タイミング戦略</span>
+                <span style="font-size: 0.65rem; color: #16a34a; font-weight: 700;">(推奨プリセット適用中)</span>
+              </label>
+              <select id="settingGsTimingStrategy" class="filter-select" onchange="onAdvancedGsSettingChange()" style="font-size: 0.74rem; padding: 5px 8px; border-color: #cbd5e1;">
+                <option value="early_smart" selected>早めの給油推奨 (峠・半島手前の市街地で安全確保 / プリセット)</option>
+                <option value="exact">規定距離ぴったり (計算インターバル通りに探索)</option>
+                <option value="stretch">限界まで粘る (航続距離最優先・給油回数削減)</option>
+              </select>
+            </div>
+
+            <div id="boxEarlyMarginKm" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: #475569;">
+              <span>手前給油マージン:</span>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <input type="number" id="settingGsEarlyKm" value="20" min="5" max="50" step="5" onchange="onAdvancedGsSettingChange()" style="width: 52px; font-size: 0.75rem; padding: 2px 4px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;" />
+                <span style="font-size: 0.7rem; color: #475569;">km手前</span>
+              </div>
+            </div>
+            <div style="font-size: 0.65rem; color: #64748b; margin-top: 5px; line-height: 1.35;">
+              ※「早めの給油推奨」時は、山奥や半島の先端などGS空白地帯に入る手前の市街地・幹線道路沿いで余裕を持ってスタンドを確保します。
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size: 0.68rem; color: var(--gray-600); margin-top: 6px; line-height: 1.35;">
           ※ツーリング先・山間部で条件に一致するGSがない場合は、安全のため近隣の営業中GSを自動案内します。
         </div>
       </div>
@@ -2301,6 +2351,26 @@
         <p style="font-size: 0.72rem; color: #3b82f6; line-height: 1.35; margin-bottom: 2px;">
           給油スタンドおよび経由地を実際の走行順に組み込んだGoogleマップURLです。スマホで開くと直接Googleマップアプリでナビ開始できます。
         </p>
+
+        <!-- Google Maps Waypoint Export Mode (Exact Coordinates vs Place Search) -->
+        <div style="background: #ffffff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 10px; margin: 6px 0; font-size: 0.72rem;">
+          <div style="font-weight: 700; color: #1e40af; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+            <span>📍 Googleマップへの経由地渡し方:</span>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1e293b; font-weight: 600;">
+              <input type="radio" name="gmapsWaypointMode" value="exact_coords" checked onchange="onGmapsWaypointModeChange()">
+              <span>正確な位置（座標・ズレ0% / 推奨）</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: #475569;">
+              <input type="radio" name="gmapsWaypointMode" value="place_name" onchange="onGmapsWaypointModeChange()">
+              <span>店名表示優先（Google検索）</span>
+            </label>
+          </div>
+          <div style="font-size: 0.65rem; color: #64748b; margin-top: 3px; line-height: 1.3;">
+            ※「正確な位置」を選ぶと、アプリの地図と1ミリもズレずにGoogleマップで正確なナビ走行ができます。
+          </div>
+        </div>
 
         <!-- Dynamically rendered single or multi-leg container -->
         <div id="gmapsExportContainer">
@@ -2476,6 +2546,8 @@
       renderViaInputs();
       renderBikePresetOptions();
       updateFuelCalculations();
+      restoreAdvancedGsSettings();
+      restoreGmapsWaypointMode();
       renderSavedRoutesList();
       initMobileView();
       initResizer();
@@ -3430,8 +3502,13 @@
         startPoint.lng = parseFloat(pos.lng.toFixed(5));
         startPoint.name = `地点 (${startPoint.lat.toFixed(3)}, ${startPoint.lng.toFixed(3)})`;
         document.getElementById('startInput').value = startPoint.name;
-        clearRouteVisualsOnly();
-        showToast("出発地のピンを移動しました 📍");
+        if (currentRouteData && endPoint && endPoint.lat) {
+          calculateRouteAndFuelPlan();
+          showToast("出発地を移動してルートを再計算しました 🔄");
+        } else {
+          clearRouteVisualsOnly();
+          showToast("出発地のピンを移動しました 📍");
+        }
       });
 
       clearRouteVisualsOnly();
@@ -3465,8 +3542,13 @@
         endPoint.lng = parseFloat(pos.lng.toFixed(5));
         endPoint.name = `地点 (${endPoint.lat.toFixed(3)}, ${endPoint.lng.toFixed(3)})`;
         document.getElementById('endInput').value = endPoint.name;
-        clearRouteVisualsOnly();
-        showToast("目的地のピンを移動しました 📍");
+        if (currentRouteData && startPoint && startPoint.lat) {
+          calculateRouteAndFuelPlan();
+          showToast("目的地のピンを移動してルートを再計算しました 🔄");
+        } else {
+          clearRouteVisualsOnly();
+          showToast("目的地のピンを移動しました 📍");
+        }
       });
 
       clearRouteVisualsOnly();
@@ -3613,22 +3695,61 @@
 
       refreshViaMarkers();
       renderViaInputs();
-      clearRouteVisualsOnly();
-      showToast(`経由地の順序を変更しました ↕️`);
+      if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
+        calculateRouteAndFuelPlan();
+        showToast(`経由地の順序を変更してルートを再計算しました ↕️`);
+      } else {
+        clearRouteVisualsOnly();
+        showToast(`経由地の順序を変更しました ↕️`);
+      }
     }
 
     function refreshViaMarkers() {
       viaPoints.forEach((v, i) => {
         const num = i + 1;
-        if (v.marker) {
+        if (v.lat !== null && v.lng !== null) {
           const icon = L.divIcon({
             className: 'custom-div-icon',
             html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
             iconSize: [28, 28],
             iconAnchor: [14, 14]
           });
-          v.marker.setIcon(icon);
-          v.marker.bindPopup(`<b>🟡 経由地 #${num}</b><br>${v.name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
+
+          if (!v.marker) {
+            v.marker = L.marker([v.lat, v.lng], { icon, draggable: true }).addTo(map);
+            v.marker.on('dragend', function(e) {
+              const pos = e.target.getLatLng();
+              v.lat = parseFloat(pos.lat.toFixed(5));
+              v.lng = parseFloat(pos.lng.toFixed(5));
+              v.name = `地点 (${v.lat.toFixed(3)}, ${v.lng.toFixed(3)})`;
+              const inp = document.getElementById(`viaInput_${v.id}`);
+              if (inp) inp.value = v.name;
+              if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
+                calculateRouteAndFuelPlan();
+                showToast(`経由地 #${num} を移動してルートを再計算しました 🔄`);
+              } else {
+                clearRouteVisualsOnly();
+                showToast(`経由地 #${num} のピンを移動しました 📍`);
+              }
+            });
+          } else {
+            v.marker.setIcon(icon);
+            v.marker.setLatLng([v.lat, v.lng]);
+          }
+
+          v.marker.bindPopup(`
+            <div style="font-size:0.8rem; line-height:1.4;">
+              <b>🟡 経由地 #${num}</b><br>
+              <div style="color:#334155; margin:3px 0;">${escapeXml(v.name)}</div>
+              <div style="color:#64748b; font-size:0.7rem;">📍 ピンをドラッグして走りたい道へ移動可能</div>
+              <button type="button" onclick="removeViaPoint(${v.id})" style="margin-top:6px; background:#fee2e2; border:1px solid #f87171; color:#b91c1c; border-radius:4px; font-size:0.7rem; padding:3px 8px; cursor:pointer; font-weight:600;">
+                🗑️ この経由地を削除
+              </button>
+            </div>
+          `);
+        } else if (v.marker) {
+          map.removeLayer(v.marker);
+          v.marker = null;
         }
       });
     }
@@ -3654,33 +3775,8 @@
     function addViaPoint(lat, lng, name) {
       if (viaPoints.length >= MAX_VIA_POINTS) return;
       const id = Date.now();
-      const num = viaPoints.length + 1;
-
-      const icon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
-      });
-
-      const marker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
-        .bindPopup(`<b>🟡 経由地 #${num}</b><br>${name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
-
-      marker.on('dragend', function(e) {
-        const pos = e.target.getLatLng();
-        const v = viaPoints.find(item => item.id === id);
-        if (v) {
-          v.lat = parseFloat(pos.lat.toFixed(5));
-          v.lng = parseFloat(pos.lng.toFixed(5));
-          v.name = `地点 (${v.lat.toFixed(3)}, ${v.lng.toFixed(3)})`;
-          const inp = document.getElementById(`viaInput_${id}`);
-          if (inp) inp.value = v.name;
-          clearRouteVisualsOnly();
-          showToast(`経由地 #${num} のピンを移動しました 📍`);
-        }
-      });
-
-      viaPoints.push({ id, lat, lng, name, marker });
+      viaPoints.push({ id, lat, lng, name, marker: null });
+      refreshViaMarkers();
       renderViaInputs();
       clearRouteVisualsOnly();
     }
@@ -3692,34 +3788,11 @@
       v.lng = lng;
       v.name = name;
 
-      const idx = viaPoints.findIndex(item => item.id === id);
-      const num = idx + 1;
-
-      if (v.marker) map.removeLayer(v.marker);
-
-      const icon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
-      });
-
-      v.marker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
-        .bindPopup(`<b>🟡 経由地 #${num}</b><br>${name}`);
-
-      v.marker.on('dragend', function(e) {
-        const pos = e.target.getLatLng();
-        v.lat = parseFloat(pos.lat.toFixed(5));
-        v.lng = parseFloat(pos.lng.toFixed(5));
-        v.name = `地点 (${v.lat.toFixed(3)}, ${v.lng.toFixed(3)})`;
-        const inp = document.getElementById(`viaInput_${id}`);
-        if (inp) inp.value = v.name;
-        clearRouteVisualsOnly();
-      });
-
       const inp = document.getElementById(`viaInput_${id}`);
       if (inp) inp.value = name;
       updateStatusBadge(`via_${id}`, 'ok');
+
+      refreshViaMarkers();
       clearRouteVisualsOnly();
     }
 
@@ -3730,9 +3803,95 @@
         viaPoints.splice(idx, 1);
         refreshViaMarkers();
         renderViaInputs();
-        clearRouteVisualsOnly();
-        showToast("経由地を削除しました");
+        if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
+          calculateRouteAndFuelPlan();
+          showToast("経由地を削除してルートを再計算しました 🔄");
+        } else {
+          clearRouteVisualsOnly();
+          showToast("経由地を削除しました");
+        }
       }
+    }
+
+    // ==========================================
+    // Interactive Route Drag & Swipe Editing (手動スワイプ/ドラッグ経路修正)
+    // ==========================================
+    // ルート線上のタップ/ドラッグ位置に経由地を正しい順序で挿入し、即座にルートを変形・再計算
+    function insertViaPointOnRoute(lat, lng) {
+      if (viaPoints.length >= MAX_VIA_POINTS) {
+        showToast(`⚠️ 経由地は最大${MAX_VIA_POINTS}箇所までです。不要な経由地を削除してから追加してください。`);
+        return null;
+      }
+
+      const coords = currentRouteData ? currentRouteData.geometry.coordinates : null;
+      let insertIndex = viaPoints.length;
+
+      if (coords && coords.length > 0) {
+        function findClosestIdx(pLat, pLng) {
+          let minD = Infinity, best = 0;
+          for (let i = 0; i < coords.length; i++) {
+            const d = haversineDistance(pLat, pLng, coords[i][1], coords[i][0]);
+            if (d < minD) { minD = d; best = i; }
+          }
+          return best;
+        }
+
+        const clickIdx = findClosestIdx(lat, lng);
+        insertIndex = 0;
+        for (let i = 0; i < viaPoints.length; i++) {
+          const v = viaPoints[i];
+          if (v.lat !== null && v.lng !== null) {
+            const vIdx = findClosestIdx(v.lat, v.lng);
+            if (clickIdx > vIdx) {
+              insertIndex = i + 1;
+            }
+          }
+        }
+      }
+
+      const id = Date.now();
+      const vLat = parseFloat(lat.toFixed(5));
+      const vLng = parseFloat(lng.toFixed(5));
+      const vName = `ルート調整 (${vLat.toFixed(3)}, ${vLng.toFixed(3)})`;
+
+      const newVia = { id, lat: vLat, lng: vLng, name: vName, marker: null };
+      viaPoints.splice(insertIndex, 0, newVia);
+
+      refreshViaMarkers();
+      renderViaInputs();
+
+      // 新しい経由地を経由してルートを自動再計算！
+      calculateRouteAndFuelPlan();
+
+      const created = viaPoints.find(v => v.id === id);
+      if (created && created.marker) {
+        created.marker.openPopup();
+      }
+
+      showToast(`🛣️ ルート上に経由地を追加しました！ピンをドラッグして走りたい道へ移動できます 📍`);
+      return newVia;
+    }
+
+    function setupRoutePolylineInteraction(polyline) {
+      if (!polyline) return;
+
+      // ホバー時のハイライト効果
+      polyline.on('mouseover', function(e) {
+        polyline.setStyle({ color: '#ea580c', weight: 9, opacity: 0.95 });
+        map.getContainer().style.cursor = 'pointer';
+      });
+
+      polyline.on('mouseout', function(e) {
+        polyline.setStyle({ color: '#1a73e8', weight: 6, opacity: 0.85 });
+        map.getContainer().style.cursor = '';
+      });
+
+      // ルート線をクリック/タップすると、その場所に経由地を追加してドラッグ可能に！
+      polyline.on('click', function(e) {
+        L.DomEvent.stopPropagation(e);
+        const latlng = e.latlng;
+        insertViaPointOnRoute(latlng.lat, latlng.lng);
+      });
     }
 
     function clearAllVias() {
@@ -4028,6 +4187,8 @@
           lineJoin: 'round'
         }).addTo(map);
 
+        setupRoutePolylineInteraction(routePolyline);
+
         map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
 
         const totalDistKm = (route.distance / 1000).toFixed(1);
@@ -4098,10 +4259,19 @@
       gasStationMarkers = [];
       plannedStops = [];
 
-      const { safeTarget } = updateFuelCalculations();
+      const { safeTarget, maxRange } = updateFuelCalculations();
       const coords = route.geometry.coordinates;
       const totalDistMeters = route.distance;
-      const targetIntervalMeters = safeTarget * 1000;
+
+      const timingStrategy = document.getElementById('settingGsTimingStrategy')?.value || 'early_smart';
+      const searchRadiusMeters = parseInt(document.getElementById('settingGsRadius')?.value || '10000', 10);
+      const earlyMarginKm = parseFloat(document.getElementById('settingGsEarlyKm')?.value || '20');
+
+      let targetIntervalMeters = safeTarget * 1000;
+      if (timingStrategy === 'stretch') {
+        // 限界まで粘るモード: 航続距離の92%程度まで走行して給油回数を抑制
+        targetIntervalMeters = Math.round(maxRange * 0.92) * 1000;
+      }
 
       if (!totalDurationSeconds) {
         totalDurationSeconds = route.duration;
@@ -4131,10 +4301,12 @@
       let cumulativeDist = 0;
       let nextTargetMeters = targetIntervalMeters;
       let milestoneIndices = [];
+      const distAtIndex = [0];
 
       for (let i = 1; i < coords.length; i++) {
         const d = haversineDistance(coords[i-1][1], coords[i-1][0], coords[i][1], coords[i][0]);
         cumulativeDist += d;
+        distAtIndex.push(cumulativeDist);
 
         if (cumulativeDist >= nextTargetMeters && cumulativeDist < totalDistMeters - 20000) {
           const ratio = cumulativeDist / totalDistMeters;
@@ -4170,7 +4342,10 @@
           .bindPopup(`<b>給油推奨ライン #${m.stopNumber}</b><br>累積走行距離: 約 ${m.distanceKm} km<br>予定通過時刻: <b>${formatTime(m.eta)}</b>`);
         fuelMilestoneMarkers.push(mMarker);
 
-        const gs = await findGasStationNearWithHours(m.lat, m.lng, m.distanceKm, m.stopNumber, m.eta);
+        const gs = await findGasStationNearWithHours(
+          m.lat, m.lng, m.distanceKm, m.stopNumber, m.eta,
+          coords, m.coordIndex, distAtIndex
+        );
         plannedStops.push(gs);
 
         const gsIcon = L.divIcon({
@@ -4233,6 +4408,62 @@
       }
     }
 
+    // ==========================================
+    // Advanced Fuel Algorithm Settings (裏データ・詳細チューニング)
+    // ==========================================
+    function toggleAdvancedGsSettings() {
+      const box = document.getElementById('advancedGsSettingsBox');
+      const chevron = document.getElementById('advancedGsChevron');
+      if (!box) return;
+      const isHidden = box.style.display === 'none' || !box.style.display;
+      box.style.display = isHidden ? 'block' : 'none';
+      if (chevron) {
+        chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
+    }
+
+    function onAdvancedGsSettingChange() {
+      const radius = document.getElementById('settingGsRadius')?.value;
+      const timing = document.getElementById('settingGsTimingStrategy')?.value;
+      const earlyKm = document.getElementById('settingGsEarlyKm')?.value;
+      try {
+        if (radius) localStorage.setItem('moto_gs_radius', radius);
+        if (timing) localStorage.setItem('moto_gs_timing', timing);
+        if (earlyKm) localStorage.setItem('moto_gs_early_km', earlyKm);
+      } catch (e) {}
+
+      const boxEarly = document.getElementById('boxEarlyMarginKm');
+      if (boxEarly) {
+        boxEarly.style.display = (timing === 'early_smart') ? 'flex' : 'none';
+      }
+
+      if (currentRouteData) {
+        generateFuelPlanFromRoute(currentRouteData);
+        showToast("給油アルゴリズム詳細設定を反映しました ⚙️");
+      }
+    }
+
+    function restoreAdvancedGsSettings() {
+      try {
+        const radius = localStorage.getItem('moto_gs_radius');
+        const timing = localStorage.getItem('moto_gs_timing');
+        const earlyKm = localStorage.getItem('moto_gs_early_km');
+        if (radius && document.getElementById('settingGsRadius')) {
+          document.getElementById('settingGsRadius').value = radius;
+        }
+        if (timing && document.getElementById('settingGsTimingStrategy')) {
+          document.getElementById('settingGsTimingStrategy').value = timing;
+        }
+        if (earlyKm && document.getElementById('settingGsEarlyKm')) {
+          document.getElementById('settingGsEarlyKm').value = earlyKm;
+        }
+        const boxEarly = document.getElementById('boxEarlyMarginKm');
+        if (boxEarly && timing) {
+          boxEarly.style.display = (timing === 'early_smart') ? 'flex' : 'none';
+        }
+      } catch (e) {}
+    }
+
     // Googleマップ上で「もしかして」を出さず、その場所のガソリンスタンドを一発特定するための高精度クエリ生成
     // 例: 「香川県観音寺市吉岡町 ENEOS」のように、スタンドの住所（都道府県・市区町村・町名）を結合！
     async function getGsPreciseLocationQuery(lat, lng, brand, rawName) {
@@ -4279,15 +4510,10 @@
       return `${lat.toFixed(5)},${lng.toFixed(5)}`;
     }
 
-    async function findGasStationNearWithHours(lat, lng, distKm, stopNum, etaDate) {
-      const etaHour = etaDate.getHours() + etaDate.getMinutes() / 60;
-      const brandFilter = document.getElementById('filterGsBrand')?.value || 'all';
-      const serviceFilter = document.getElementById('filterGsService')?.value || 'all';
-      let nearbyCandidates = [];
-      
+    // OpenStreetMap Overpass API から指定座標周辺のスタンドを検索するコアヘルパー
+    async function queryOsmFuelStations(searchLat, searchLng, searchRadiusMeters, etaHour, brandFilter, serviceFilter, distKm, stopNum) {
       try {
-        // nodeだけでなくway(敷地)も含め、探索半径を10,000mに拡大して実在スタンドを漏れなく取得
-        const query = `[out:json][timeout:5];nwr["amenity"="fuel"](around:10000,${lat},${lng});out center 25;`;
+        const query = `[out:json][timeout:5];nwr["amenity"="fuel"](around:${searchRadiusMeters},${searchLat},${searchLng});out center 25;`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4500);
 
@@ -4302,6 +4528,7 @@
             let bestMatch = null;
             let brandMatch = null;
             let anyOpenMatch = null;
+            const nearbyCandidates = [];
 
             for (const el of data.elements) {
               const elLat = el.lat || (el.center && el.center.lat);
@@ -4318,20 +4545,19 @@
               const isServiceMatch = matchesServiceFilter(el.tags, rawName, serviceFilter);
               const serviceText = isSelf ? "セルフ" : "フルサービス";
 
-              // 実在する店名。未設定ならブランド名+方面
               const displayName = rawName ? rawName : `${brand} (${serviceText})`;
               const realStoreName = el.tags.name || rawName || "";
 
               const cand = {
                 name: displayName,
                 realStoreName: realStoreName,
-                googleSearchQuery: "", // 下で住所結合して確定
+                googleSearchQuery: "",
                 brand,
                 serviceText,
                 isSelf,
                 lat: parseFloat(elLat.toFixed(5)),
                 lng: parseFloat(elLng.toFixed(5)),
-                detourKm: (haversineDistance(lat, lng, elLat, elLng) / 1000).toFixed(1),
+                detourKm: (haversineDistance(searchLat, searchLng, elLat, elLng) / 1000).toFixed(1),
                 distKm,
                 stopNum,
                 hoursText: hoursParsed.text,
@@ -4355,21 +4581,75 @@
               }
             }
 
-            // 距離順に並べ替え
             nearbyCandidates.sort((a, b) => parseFloat(a.detourKm) - parseFloat(b.detourKm));
-
-            const picked = bestMatch || brandMatch || anyOpenMatch || nearbyCandidates[0];
-            if (picked) {
-              picked.nearbyCandidates = nearbyCandidates;
-              // 【超重要】Googleマップが「ENEOS ガソリンスタンド」で迷子になるのを防ぐため、
-              // 住所（市町村・町名）を取得して「香川県観音寺市吉岡町 ENEOS」のように結合して一発特定させる！
-              picked.googleSearchQuery = await getGsPreciseLocationQuery(picked.lat, picked.lng, picked.brand, picked.realStoreName);
-              return picked;
-            }
+            return {
+              picked: bestMatch || brandMatch || anyOpenMatch || nearbyCandidates[0] || null,
+              candidates: nearbyCandidates
+            };
           }
         }
       } catch (e) {
         console.warn("Overpass API query timed out", e);
+      }
+      return { picked: null, candidates: [] };
+    }
+
+    async function findGasStationNearWithHours(lat, lng, distKm, stopNum, etaDate, routeCoords = null, coordIndex = 0, distAtIndex = null) {
+      const etaHour = etaDate.getHours() + etaDate.getMinutes() / 60;
+      const brandFilter = document.getElementById('filterGsBrand')?.value || 'all';
+      const serviceFilter = document.getElementById('filterGsService')?.value || 'all';
+      const searchRadiusMeters = parseInt(document.getElementById('settingGsRadius')?.value || '10000', 10);
+      const timingStrategy = document.getElementById('settingGsTimingStrategy')?.value || 'early_smart';
+      const earlyMarginKm = parseFloat(document.getElementById('settingGsEarlyKm')?.value || '20');
+
+      let picked = null;
+      let nearbyCandidates = [];
+
+      // 1. 通常マイルストーン地点での探索 (設定された探索半径を使用)
+      const initial = await queryOsmFuelStations(lat, lng, searchRadiusMeters, etaHour, brandFilter, serviceFilter, distKm, stopNum);
+      picked = initial.picked;
+      nearbyCandidates = initial.candidates;
+
+      // 2. 「早めの給油推奨」戦略 (early_smart):
+      // 山間部・半島・過疎地などで直近にスタンドがない (detourKm > 3.0km、または見つからない) 場合、
+      // 峠や半島に入る手前の市街地・幹線道路 (earlyMarginKm手前) に遡って安全なスタンドを探す！
+      if (timingStrategy === 'early_smart' && routeCoords && distAtIndex && distAtIndex.length > 0) {
+        const needsEarlyRefuel = !picked || parseFloat(picked.detourKm) > 3.0;
+        if (needsEarlyRefuel) {
+          const currentMeters = distAtIndex[coordIndex] || (distKm * 1000);
+          const earlyMeters = Math.max(5000, currentMeters - (earlyMarginKm * 1000));
+
+          let earlyIdx = 0;
+          for (let k = 0; k < distAtIndex.length; k++) {
+            if (distAtIndex[k] >= earlyMeters) {
+              earlyIdx = k;
+              break;
+            }
+          }
+
+          if (earlyIdx > 0 && earlyIdx < coordIndex) {
+            const earlyLat = routeCoords[earlyIdx][1];
+            const earlyLng = routeCoords[earlyIdx][0];
+            const earlyDistKm = Math.round(distAtIndex[earlyIdx] / 1000);
+
+            const earlyResult = await queryOsmFuelStations(earlyLat, earlyLng, searchRadiusMeters, etaHour, brandFilter, serviceFilter, earlyDistKm, stopNum);
+            if (earlyResult.picked && parseFloat(earlyResult.picked.detourKm) <= 2.8) {
+              picked = earlyResult.picked;
+              picked.isEarlyRefuel = true;
+              picked.earlyNote = "峠・半島前の手前給油推奨";
+              picked.distKm = earlyDistKm;
+              nearbyCandidates = earlyResult.candidates;
+            }
+          }
+        }
+      }
+
+      if (picked) {
+        picked.nearbyCandidates = nearbyCandidates;
+        // 【超重要】Googleマップが「ENEOS ガソリンスタンド」で迷子になるのを防ぐため、
+        // 住所（市町村・町名）を取得して「香川県観音寺市吉岡町 ENEOS」のように結合して一発特定させる！
+        picked.googleSearchQuery = await getGsPreciseLocationQuery(picked.lat, picked.lng, picked.brand, picked.realStoreName);
+        return picked;
       }
 
       // Realistic Touring Stations Fallback
@@ -4502,12 +4782,16 @@
         ? `<span class="open-status-badge all-night">24時間営業 ⛽</span>`
         : (gs.isOpen ? `<span class="open-status-badge open">営業中 ⭕ (${gs.hoursText})</span>` : `<span class="open-status-badge closed">⚠️ 予定時刻は営業時間外 (${gs.hoursText})</span>`);
 
+      const earlyBadge = gs.isEarlyRefuel
+        ? `<span class="open-status-badge" style="background:#fef3c7; color:#92400e; font-weight:700;">手前市街地給油 📍</span>`
+        : '';
+
       const candCount = (gs.nearbyCandidates && gs.nearbyCandidates.length > 0) ? ` (候補${gs.nearbyCandidates.length}件)` : '';
 
       node.innerHTML = `
         <div class="plan-card">
           <div class="plan-card-header">
-            <span class="plan-title">⛽ 第${m.stopNumber}給油: ${escapeXml(gs.brand)}</span>
+            <span class="plan-title">⛽ 第${m.stopNumber}給油: ${escapeXml(gs.brand)}${gs.isEarlyRefuel ? ' <small style="color:#d97706; font-size:0.68rem; font-weight:700;">(峠・半島手前)</small>' : ''}</span>
             <span class="plan-eta-badge">🕒 ${formatTime(m.eta)} 着</span>
           </div>
           <div class="plan-gs-name" style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin: 4px 0;">
@@ -4518,8 +4802,9 @@
           </div>
           <div class="plan-gs-detail">
             ${statusBadge}
+            ${earlyBadge}
             <span class="open-status-badge" style="background:#e0f2fe; color:#0369a1;">${escapeXml(gs.serviceText)}</span>
-            <span>📍 累積: ${m.distanceKm}km</span>
+            <span>📍 累積: ${gs.distKm || m.distanceKm}km</span>
             <span>回り道: 約${gs.detourKm}km</span>
           </div>
           <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
@@ -4857,11 +5142,17 @@
       // Google Maps URL limit: max 10 total stops (origin + destination + 8 intermediates)
       const MAX_INTERMEDIATE_PER_LEG = 8; // 8 intermediates = 10 total stops per leg
 
-      // Googleマップに渡す地点パラメータ（GSは店舗名、地点は座標）
+      // Googleマップに渡す地点パラメータ（設定に応じて座標渡し or 店舗名検索渡し）
       function getStopGmapsParam(s) {
-        if (s.type === 'gs' && s.googleSearchQuery) {
-          // 店舗名で渡すことで、Googleマップ上でガソリンスタンドのプレイスピンとして確実にヒットさせる！
-          return s.googleSearchQuery;
+        const mode = document.querySelector('input[name="gmapsWaypointMode"]:checked')?.value || 'exact_coords';
+        if (s.type === 'gs') {
+          if (mode === 'place_name' && s.googleSearchQuery) {
+            // 店名表示優先: Googleマップ上で店舗プレイスとして検索
+            return s.googleSearchQuery;
+          }
+          // 正確な位置優先（推奨・ズレ0%）: スタンドの正確な座標を直接渡す！
+          // これによりGoogleマップ側が勝手に別の店舗を選び直すことが一切なくなり、アプリの地図と100%一致します
+          return `${s.lat},${s.lng}`;
         }
         return `${s.lat},${s.lng}`;
       }
@@ -5036,6 +5327,25 @@
         html += `</div>`;
         container.innerHTML = html;
       }
+    }
+
+    function onGmapsWaypointModeChange() {
+      const mode = document.querySelector('input[name="gmapsWaypointMode"]:checked')?.value || 'exact_coords';
+      try {
+        localStorage.setItem('moto_gmaps_wp_mode', mode);
+      } catch (e) {}
+      updateGoogleMapsExportLink();
+      showToast(mode === 'exact_coords' ? "Googleマップ連携: 正確な位置（ズレ0%）に設定しました 📍" : "Googleマップ連携: 店名表示優先に設定しました 🏷️");
+    }
+
+    function restoreGmapsWaypointMode() {
+      try {
+        const saved = localStorage.getItem('moto_gmaps_wp_mode');
+        if (saved) {
+          const r = document.querySelector(`input[name="gmapsWaypointMode"][value="${saved}"]`);
+          if (r) r.checked = true;
+        }
+      } catch (e) {}
     }
 
     function copySpecificUrl(url) {
