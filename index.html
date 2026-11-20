@@ -2093,19 +2093,19 @@
             <button class="btn-del-point" onclick="clearPoint('start')" title="出発地をクリア">✖</button>
           </div>
 
-          <!-- Dynamic Via Points Container (2~3 points) -->
-          <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
-            <!-- Rendered by JS -->
-          </div>
-
-          <!-- Via Actions Bar -->
-          <div class="via-actions-row">
-            <button id="btnAddVia" class="btn-add-via" onclick="addViaPointInput()">
+          <!-- Via Actions Bar (経由地リストの上に固定配置！連打してもボタン位置がズレない) -->
+          <div class="via-actions-row" style="margin: 6px 0 6px 0;">
+            <button id="btnAddVia" class="btn-add-via" onclick="addViaPointInput()" title="クリック連打で複数の経由地を一気に追加できます">
               <span>➕</span> 経由地を追加 (最大8箇所)
             </button>
             <button id="btnClearVias" class="btn-clear-vias" onclick="clearAllVias()" style="display:none;">
               経由地を全消去
             </button>
+          </div>
+
+          <!-- Dynamic Via Points Container (2~3 points) -->
+          <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
+            <!-- Rendered by JS -->
           </div>
 
           <!-- Destination / Turnaround Point -->
@@ -2505,9 +2505,16 @@
     <div id="routeEditModeBanner" class="route-edit-banner">
       <div style="display:flex; align-items:center; gap:6px;">
         <span style="font-size:1.1rem;">🖐️</span>
-        <span id="routeEditModeBannerText">スワイプ修正中: ルートを指でなぞって走りたい道へ引っ張ってください</span>
+        <span id="routeEditModeBannerText">スワイプ修正中: 線やピンを引っ張って道を曲げられます</span>
       </div>
-      <button type="button" class="btn-done-edit" onclick="toggleRouteEditMode(false)">✓ 完了</button>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button type="button" id="btnUndoSwipe" class="btn-done-edit" onclick="undoLastSwipe()" style="display:none; background:#fef3c7; color:#92400e; border:1px solid #f59e0b;" title="直前のスワイプ修正を取り消す">
+          ↩️ 戻す
+        </button>
+        <button type="button" class="btn-done-edit" onclick="toggleRouteEditMode(false)">
+          ✓ 完了
+        </button>
+      </div>
     </div>
 
     <div class="map-overlay-tip">
@@ -3213,6 +3220,7 @@
       const mapOverlayControls = [
         document.getElementById('btnRouteEditMode'),
         document.getElementById('routeEditModeBanner'),
+        document.getElementById('btnUndoSwipe'),
         document.querySelector('.btn-gps-locate'),
         document.querySelector('.mobile-map-calc-btn'),
         document.querySelector('.pin-drop-active-bar'),
@@ -3863,7 +3871,7 @@
               const inp = document.getElementById(`viaInput_${v.id}`);
               if (inp) inp.value = v.name;
               if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
-                calculateRouteAndFuelPlan();
+                calculateRouteAndFuelPlan(isRouteEditModeActive);
                 showToast(`経由地 #${num} を移動してルートを再計算しました 🔄`);
               } else {
                 clearRouteVisualsOnly();
@@ -3954,13 +3962,141 @@
     // ==========================================
     // Interactive Route Drag & Swipe Editing (手動スワイプ/ドラッグ経路修正)
     // ==========================================
-    // ルート線上のタップ/ドラッグ位置に経由地を正しい順序で挿入し、即座にルートを変形・再計算
-    function insertViaPointOnRoute(lat, lng) {
-      if (viaPoints.length >= MAX_VIA_POINTS) {
-        showToast(`⚠️ 経由地は最大${MAX_VIA_POINTS}箇所までです。不要な経由地を削除してから追加してください。`);
-        return null;
+    let lastSwipeViaId = null; // 直前にスワイプで作成・更新した経由地ID（ピンの増殖防止用）
+    let swipeHistory = [];     // 直前のスワイプを取り消すUndo用履歴
+
+    function saveSwipeHistoryState() {
+      const snapshot = viaPoints.map(v => ({ id: v.id, lat: v.lat, lng: v.lng, name: v.name, isSwipeAdjust: !!v.isSwipeAdjust }));
+      swipeHistory.push(snapshot);
+      if (swipeHistory.length > 8) swipeHistory.shift();
+      updateUndoButtonState();
+    }
+
+    function undoLastSwipe() {
+      if (swipeHistory.length === 0) {
+        showToast("元に戻す履歴がありません");
+        return;
+      }
+      const prev = swipeHistory.pop();
+      updateUndoButtonState();
+
+      viaPoints.forEach(v => {
+        if (v.marker) map.removeLayer(v.marker);
+      });
+
+      viaPoints = prev.map(p => ({
+        id: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.name,
+        isSwipeAdjust: p.isSwipeAdjust,
+        marker: null
+      }));
+
+      lastSwipeViaId = null;
+      refreshViaMarkers();
+      renderViaInputs();
+      calculateRouteAndFuelPlan(true);
+      showToast("↩️ 直前のスワイプ修正を取り消しました");
+    }
+
+    function updateUndoButtonState() {
+      const btnUndo = document.getElementById('btnUndoSwipe');
+      if (btnUndo) {
+        btnUndo.style.display = (isRouteEditModeActive && swipeHistory.length > 0) ? 'inline-flex' : 'none';
+      }
+    }
+
+    // スワイプ操作でルートを曲げる：同じ区間ならピンを増やさず既存ピンを移動して再計算！
+    function applyRouteSwipeAdjustment(destLat, destLng, originLatLng = null) {
+      saveSwipeHistoryState();
+
+      const vLat = parseFloat(destLat.toFixed(5));
+      const vLng = parseFloat(destLng.toFixed(5));
+      const vName = `ルート調整 (${vLat.toFixed(3)}, ${vLng.toFixed(3)})`;
+
+      // 1. 直前のスワイプで置いた調整ピンがある場合、その近隣（直線20km以内）の再スワイプは既存ピンを移動！
+      if (lastSwipeViaId !== null) {
+        const lastVia = viaPoints.find(v => v.id === lastSwipeViaId);
+        if (lastVia) {
+          const dFromLast = originLatLng 
+            ? haversineDistance(originLatLng.lat, originLatLng.lng, lastVia.lat, lastVia.lng)
+            : haversineDistance(vLat, vLng, lastVia.lat, lastVia.lng);
+
+          if (dFromLast < 20000) { // 20km以内の微調整なら新しいピンを増やさず既存ピンを移動！
+            lastVia.lat = vLat;
+            lastVia.lng = vLng;
+            lastVia.name = vName;
+            const inp = document.getElementById(`viaInput_${lastVia.id}`);
+            if (inp) inp.value = vName;
+            if (lastVia.marker) lastVia.marker.setLatLng([vLat, vLng]);
+
+            refreshViaMarkers();
+            renderViaInputs();
+            calculateRouteAndFuelPlan(true);
+            showToast(`📍 調整ピンを移動しました（ピンは増えません）`);
+            return lastVia;
+          }
+        }
       }
 
+      // 2. スワイプ開始位置の近く（5km以内）に既存の経由地があれば、その経由地を移動！
+      if (originLatLng) {
+        let closestVia = null;
+        let minD = Infinity;
+        for (const v of viaPoints) {
+          if (v.lat !== null && v.lng !== null) {
+            const d = haversineDistance(originLatLng.lat, originLatLng.lng, v.lat, v.lng);
+            if (d < minD) {
+              minD = d;
+              closestVia = v;
+            }
+          }
+        }
+        if (closestVia && minD < 5000) {
+          closestVia.lat = vLat;
+          closestVia.lng = vLng;
+          closestVia.name = vName;
+          lastSwipeViaId = closestVia.id;
+          const inp = document.getElementById(`viaInput_${closestVia.id}`);
+          if (inp) inp.value = vName;
+          if (closestVia.marker) closestVia.marker.setLatLng([vLat, vLng]);
+
+          refreshViaMarkers();
+          renderViaInputs();
+          calculateRouteAndFuelPlan(true);
+          showToast(`📍 既存の経由地を新しい道へ移動しました 🔄`);
+          return closestVia;
+        }
+      }
+
+      // 3. 別の区間をスワイプした場合
+      // 経由地上限に達している場合は、最も近いスワイプ調整ピンを移動して再利用！
+      if (viaPoints.length >= MAX_VIA_POINTS) {
+        const swipeVias = viaPoints.filter(v => v.isSwipeAdjust);
+        if (swipeVias.length > 0 && originLatLng) {
+          let nearest = swipeVias[0];
+          let nd = Infinity;
+          swipeVias.forEach(v => {
+            const d = haversineDistance(originLatLng.lat, originLatLng.lng, v.lat, v.lng);
+            if (d < nd) { nd = d; nearest = v; }
+          });
+          nearest.lat = vLat;
+          nearest.lng = vLng;
+          nearest.name = vName;
+          lastSwipeViaId = nearest.id;
+          refreshViaMarkers();
+          renderViaInputs();
+          calculateRouteAndFuelPlan(true);
+          showToast(`⚠️ 経由地上限のため、最寄りの調整ピンを移動してルートを更新しました`);
+          return nearest;
+        } else {
+          showToast(`⚠️ 経由地は最大${MAX_VIA_POINTS}箇所までです。不要な経由地を削除してから追加してください。`);
+          return null;
+        }
+      }
+
+      // 適切な順序で新規スワイプ調整ピンを挿入
       const coords = currentRouteData ? currentRouteData.geometry.coordinates : null;
       let insertIndex = viaPoints.length;
 
@@ -3974,7 +4110,7 @@
           return best;
         }
 
-        const clickIdx = findClosestIdx(lat, lng);
+        const clickIdx = findClosestIdx(vLat, vLng);
         insertIndex = 0;
         for (let i = 0; i < viaPoints.length; i++) {
           const v = viaPoints[i];
@@ -3988,26 +4124,21 @@
       }
 
       const id = Date.now();
-      const vLat = parseFloat(lat.toFixed(5));
-      const vLng = parseFloat(lng.toFixed(5));
-      const vName = `ルート調整 (${vLat.toFixed(3)}, ${vLng.toFixed(3)})`;
-
-      const newVia = { id, lat: vLat, lng: vLng, name: vName, marker: null };
+      const newVia = { id, lat: vLat, lng: vLng, name: vName, isSwipeAdjust: true, marker: null };
       viaPoints.splice(insertIndex, 0, newVia);
+      lastSwipeViaId = id;
 
       refreshViaMarkers();
       renderViaInputs();
-
-      // 新しい経由地を経由してルートを自動再計算（スワイプ修正モードを維持！）
       calculateRouteAndFuelPlan(true);
 
-      const created = viaPoints.find(v => v.id === id);
-      if (created && created.marker) {
-        created.marker.openPopup();
-      }
-
-      showToast(`🛣️ ルート上に経由地を追加しました！ピンをドラッグして走りたい道へ移動できます 📍`);
+      showToast(`🛣️ スワイプで道を曲げました！同じ場所をさらに引っ張るとピンを増やさず微調整できます 📍`);
       return newVia;
+    }
+
+    // 単純タップで経由地を追加する用
+    function insertViaPointOnRoute(lat, lng) {
+      return applyRouteSwipeAdjustment(lat, lng, null);
     }
 
     // ==========================================
@@ -4066,6 +4197,10 @@
 
         showToast("🖐️ スワイプ修正モード開始！オレンジ色のルート線を指で引っ張って走りたい道へ曲げてください");
       } else {
+        lastSwipeViaId = null; // 完了したので調整ピン追跡をリセット
+        swipeHistory = [];    // 履歴リセット
+        updateUndoButtonState();
+
         // 地図上フローティングボタンの通常表示
         if (btn) {
           btn.classList.remove('active');
@@ -4174,12 +4309,12 @@
 
       if (finalLatLng && swipeOriginLatLng) {
         const distMoved = haversineDistance(swipeOriginLatLng.lat, swipeOriginLatLng.lng, finalLatLng.lat, finalLatLng.lng);
-        // 120m以上ドラッグした場合はその位置に経由地を挿入して変形
+        // 120m以上ドラッグした場合はスワイプ調整を実行（近隣ならピンを増やさず既存ピンを移動）
         if (distMoved >= 120) {
-          insertViaPointOnRoute(finalLatLng.lat, finalLatLng.lng);
+          applyRouteSwipeAdjustment(finalLatLng.lat, finalLatLng.lng, swipeOriginLatLng);
         } else {
-          // 移動が小さかった場合はタップ位置に経由地ピンを追加
-          insertViaPointOnRoute(swipeOriginLatLng.lat, swipeOriginLatLng.lng);
+          // 移動が小さかった場合はタップ位置で調整
+          applyRouteSwipeAdjustment(swipeOriginLatLng.lat, swipeOriginLatLng.lng, swipeOriginLatLng);
         }
       }
       lastSwipeEndTime = Date.now();
@@ -4226,7 +4361,7 @@
         if (!isRouteEditModeActive) {
           toggleRouteEditMode(true);
         }
-        insertViaPointOnRoute(latlng.lat, latlng.lng);
+        applyRouteSwipeAdjustment(latlng.lat, latlng.lng, latlng);
       });
     }
 
