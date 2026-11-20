@@ -3570,6 +3570,11 @@
     // Map Click Handler (Target-aware)
     // ==========================================
     function handleMapClick(e) {
+      // 【最重要】スワイプ修正モード中は地図クリックで絶対にルートを消去しない！
+      if (isRouteEditModeActive) {
+        return;
+      }
+
       const lat = parseFloat(e.latlng.lat.toFixed(5));
       const lng = parseFloat(e.latlng.lng.toFixed(5));
       const coordName = `地点 (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
@@ -3993,8 +3998,8 @@
       refreshViaMarkers();
       renderViaInputs();
 
-      // 新しい経由地を経由してルートを自動再計算！
-      calculateRouteAndFuelPlan();
+      // 新しい経由地を経由してルートを自動再計算（スワイプ修正モードを維持！）
+      calculateRouteAndFuelPlan(true);
 
       const created = viaPoints.find(v => v.id === id);
       if (created && created.marker) {
@@ -4049,7 +4054,8 @@
         }
         if (banner) banner.classList.add('active');
         if (routePolyline) {
-          // スワイプしやすいようにオレンジ色の太線に変化
+          // スワイプしやすいようにオレンジ色の太線に変化し、最前面に表示
+          routePolyline.bringToFront();
           routePolyline.setStyle({ color: '#ea580c', weight: 14, opacity: 0.95 });
         }
 
@@ -4140,6 +4146,8 @@
       }
     }
 
+    let lastSwipeEndTime = 0;
+
     function onRouteSwipeEnd(e) {
       if (!isSwipingRoute) return;
       isSwipingRoute = false;
@@ -4174,6 +4182,7 @@
           insertViaPointOnRoute(swipeOriginLatLng.lat, swipeOriginLatLng.lng);
         }
       }
+      lastSwipeEndTime = Date.now();
       swipeOriginLatLng = null;
     }
 
@@ -4207,9 +4216,12 @@
         }
       });
 
-      // 通常タップでも経由地を追加可能（まだ修正モードでなくても案内を出す）
+      // クリックでの経由地追加（ドラッグ直後の誤発火はガード）
       polyline.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
+        if (isSwipingRoute || (Date.now() - lastSwipeEndTime < 450)) {
+          return;
+        }
         const latlng = e.latlng;
         if (!isRouteEditModeActive) {
           toggleRouteEditMode(true);
@@ -4237,12 +4249,12 @@
       showToast("すべてのピンとルートをリセットしました 🗑️");
     }
 
-    function clearRouteVisualsOnly() {
-      if (isRouteEditModeActive) {
+    function clearRouteVisualsOnly(preserveEditMode = false) {
+      if (isRouteEditModeActive && !preserveEditMode) {
         toggleRouteEditMode(false);
       }
       const btnEdit = document.getElementById('btnRouteEditMode');
-      if (btnEdit) btnEdit.style.display = 'none';
+      if (btnEdit && !preserveEditMode) btnEdit.style.display = 'none';
 
       if (routePolyline) {
         map.removeLayer(routePolyline);
@@ -4253,9 +4265,11 @@
       gasStationMarkers.forEach(m => map.removeLayer(m));
       gasStationMarkers = [];
       plannedStops = [];
-      document.getElementById('routeOverviewCard').style.display = 'none';
-      document.getElementById('planSection').style.display = 'none';
-      document.getElementById('exportCard').style.display = 'none';
+      if (!preserveEditMode) {
+        document.getElementById('routeOverviewCard').style.display = 'none';
+        document.getElementById('planSection').style.display = 'none';
+        document.getElementById('exportCard').style.display = 'none';
+      }
     }
 
     function clearRouteOverlays() {
@@ -4450,8 +4464,9 @@
     // ==========================================
     // Route Calculation (OSRM)
     // ==========================================
-    async function calculateRouteAndFuelPlan() {
-      showLoading("ピン位置を確認中...");
+    async function calculateRouteAndFuelPlan(preserveEditMode = false) {
+      const wasEditMode = isRouteEditModeActive || preserveEditMode;
+      showLoading(wasEditMode ? "スワイプ修正のルートを再計算中..." : "ピン位置を確認中...");
 
       const sText = document.getElementById('startInput').value.trim();
       if (sText && (!startPoint || startPoint.name !== sText)) {
@@ -4485,8 +4500,8 @@
         return;
       }
 
-      clearRouteVisualsOnly();
-      showLoading("OSRMでルートを算出中...");
+      clearRouteVisualsOnly(wasEditMode);
+      showLoading(wasEditMode ? "スワイプ修正のルートを再計算中..." : "OSRMでルートを算出中...");
 
       try {
         const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
@@ -4511,11 +4526,32 @@
 
         const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
         routePolyline = L.polyline(latlngs, {
-          color: '#1a73e8',
-          weight: 6,
-          opacity: 0.85,
+          color: wasEditMode ? '#ea580c' : '#1a73e8',
+          weight: wasEditMode ? 14 : 6,
+          opacity: wasEditMode ? 0.95 : 0.85,
           lineJoin: 'round'
         }).addTo(map);
+
+        if (wasEditMode) {
+          routePolyline.bringToFront();
+          isRouteEditModeActive = true;
+          const banner = document.getElementById('routeEditModeBanner');
+          if (banner) banner.classList.add('active');
+          const btn = document.getElementById('btnRouteEditMode');
+          if (btn) {
+            btn.classList.add('active');
+            btn.innerHTML = `<span class="icon">✓</span> <span class="label">修正完了</span>`;
+            btn.style.display = 'inline-flex';
+          }
+          const sidebarBtn = document.getElementById('btnRouteEditSidebar');
+          if (sidebarBtn) {
+            sidebarBtn.classList.add('active');
+            sidebarBtn.innerHTML = `<span>✓</span> <span>修正完了（確定）</span>`;
+            sidebarBtn.style.background = '#16a34a';
+            sidebarBtn.style.borderColor = '#15803d';
+            sidebarBtn.style.color = '#ffffff';
+          }
+        }
 
         setupRoutePolylineInteraction(routePolyline);
 
@@ -4544,7 +4580,7 @@
         await generateFuelPlanFromRoute(route, totalDurationSeconds);
 
         // ピンモードで計算した場合、結果画面（プランタブ）を見せるため通常レイアウトに復帰
-        if (document.body.classList.contains('pin-layout-active')) {
+        if (!wasEditMode && document.body.classList.contains('pin-layout-active')) {
           document.body.classList.remove('pin-layout-active');
           if (window.innerWidth <= 820) {
             switchMobileTab('plan');
