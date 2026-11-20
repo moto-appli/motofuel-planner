@@ -2507,7 +2507,7 @@
         <span style="font-size:1.1rem;">🖐️</span>
         <span id="routeEditModeBannerText">スワイプ修正中: ルートを指でなぞって走りたい道へ引っ張ってください</span>
       </div>
-      <button type="button" class="btn-done-edit" onclick="toggleRouteEditMode()">✓ 完了</button>
+      <button type="button" class="btn-done-edit" onclick="toggleRouteEditMode(false)">✓ 完了</button>
     </div>
 
     <div class="map-overlay-tip">
@@ -3224,23 +3224,6 @@
           L.DomEvent.disableScrollPropagation(el);
         }
       });
-
-      // スワイプ修正ボタン専用の直接イベントリスナー設定（click / touchend / pointerdown）
-      const btnSwipe = document.getElementById('btnRouteEditMode');
-      if (btnSwipe) {
-        L.DomEvent.disableClickPropagation(btnSwipe);
-        L.DomEvent.disableScrollPropagation(btnSwipe);
-        btnSwipe.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          toggleRouteEditMode();
-        });
-        btnSwipe.addEventListener('touchend', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          toggleRouteEditMode();
-        });
-      }
     }
 
     // ==========================================
@@ -4030,8 +4013,15 @@
     let swipeGhostMarker = null;
     let swipeRubberBand = null;
     let swipeOriginLatLng = null;
+    let lastToggleEditModeTime = 0;
 
     function toggleRouteEditMode(forceState = null) {
+      const now = Date.now();
+      if (now - lastToggleEditModeTime < 350) {
+        return; // タッチ端末でのtouchstart/touchend/click二重発火を完全にガード
+      }
+      lastToggleEditModeTime = now;
+
       if (!currentRouteData || !routePolyline) {
         showToast("先にルートを計算してください 🗺️");
         return;
