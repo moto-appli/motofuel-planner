@@ -2141,6 +2141,19 @@
           </div>
         </div>
 
+        <!-- Avoid Same Road (Loop / Circuit Priority) Toggle -->
+        <div style="margin-top: 8px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label for="checkAvoidSameRoad" style="font-size: 0.74rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+              <span>🔄</span> 同じ道を通らない (周回・ループ優先)
+            </label>
+            <input type="checkbox" id="checkAvoidSameRoad" onchange="onAvoidSameRoadChange()" style="width: 17px; height: 17px; accent-color: #ea580c; cursor: pointer;" />
+          </div>
+          <div style="font-size: 0.65rem; color: var(--gray-600); margin-top: 3px; line-height: 1.3;">
+            ※ 半島や往復ツーリングで行きと帰りのピストン（同じ道）を避け、ぐるっと周回する別ルートを優先します（一本道を除く）
+          </div>
+        </div>
+
         <div id="focusTipBar" class="focus-tip-bar" style="display:none;">
           <span>📍</span>
           <span id="focusTipText">地図をクリックすると選択中の位置を変更できます</span>
@@ -2721,6 +2734,7 @@
       params.set('round', isRoundTrip ? '1' : '0');
       params.set('fuel', isFuelPlanEnabled ? '1' : '0');
       params.set('hw', highwayAvoidMode);
+      params.set('loop', isAvoidSameRoadEnabled ? '1' : '0');
 
       const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null);
       if (validVias.length > 0) {
@@ -2837,6 +2851,13 @@
             sel.value = hw;
             onHighwayModeChange();
           }
+        }
+
+        // Restore loop mode (avoid same road)
+        if (params.has('loop')) {
+          isAvoidSameRoadEnabled = params.get('loop') === '1';
+          const chk = document.getElementById('checkAvoidSameRoad');
+          if (chk) chk.checked = isAvoidSameRoadEnabled;
         }
 
         // Restore bike specs
@@ -3328,6 +3349,7 @@
         breakTime: document.getElementById('checkBreakTime').checked,
         bikePreset: document.getElementById('bikePresetSelect')?.value || 'custom',
         highwayMode: document.getElementById('selectHighwayMode')?.value || 'avoid',
+        avoidSameRoad: isAvoidSameRoadEnabled,
         filterGsBrand: document.getElementById('filterGsBrand')?.value || 'all',
         filterGsService: document.getElementById('filterGsService')?.value || 'all',
         totalDistKm: totalDist,
@@ -3375,6 +3397,11 @@
         document.getElementById('selectHighwayMode').value = r.highwayMode;
         highwayAvoidMode = r.highwayMode;
       }
+      if (typeof r.avoidSameRoad === 'boolean') {
+        isAvoidSameRoadEnabled = r.avoidSameRoad;
+        const chk = document.getElementById('checkAvoidSameRoad');
+        if (chk) chk.checked = isAvoidSameRoadEnabled;
+      }
 
       // Restore Points
       setStartPoint(r.startPoint.lat, r.startPoint.lng, r.startPoint.name);
@@ -3406,6 +3433,7 @@
     let currentInputMode = 'pin'; // 'pin' (default) | 'text'
     let highwayAvoidMode = 'avoid'; // 'avoid' (デフォルト下道優先) | 'allow'
     let isFuelPlanEnabled = true; // 給油計画の有無 (true: 給油あり, false: ルートのみ)
+    let isAvoidSameRoadEnabled = false; // 同じ道を通らない (周回・ループ優先)
 
     function setFuelPlanMode(enabled) {
       isFuelPlanEnabled = enabled;
@@ -3520,6 +3548,19 @@
         calculateRouteAndFuelPlan();
       } else {
         showToast(highwayAvoidMode === 'avoid' ? "🛣️ 下道優先（有料道路なし / デフォルト）に設定しました" : "🛣️ 高速・有料道路を利用に設定しました");
+      }
+    }
+
+    function onAvoidSameRoadChange() {
+      const chk = document.getElementById('checkAvoidSameRoad');
+      isAvoidSameRoadEnabled = chk ? chk.checked : false;
+
+      if (currentRouteData) {
+        calculateRouteAndFuelPlan();
+      } else {
+        showToast(isAvoidSameRoadEnabled 
+          ? "🔄 周回・ループ優先モードをONにしました（行き帰りで同じ道を通らない）" 
+          : "周回・ループ優先モードをOFFにしました");
       }
     }
 
@@ -3962,7 +4003,7 @@
     // ==========================================
     // Interactive Route Drag & Swipe Editing (手動スワイプ/ドラッグ経路修正)
     // ==========================================
-    let lastSwipeViaId = null; // 直前にスワイプで作成・更新した経由地ID（ピンの増殖防止用）
+    let swipeAdjustVia = null; // スワイプ修正セッション専用の調整ピン（ピン増殖を完全防止！）
     let swipeHistory = [];     // 直前のスワイプを取り消すUndo用履歴
 
     function saveSwipeHistoryState() {
@@ -3972,7 +4013,7 @@
       updateUndoButtonState();
     }
 
-    function undoLastSwipe() {
+    async function undoLastSwipe() {
       if (swipeHistory.length === 0) {
         showToast("元に戻す履歴がありません");
         return;
@@ -3993,10 +4034,11 @@
         marker: null
       }));
 
-      lastSwipeViaId = null;
+      swipeAdjustVia = viaPoints.find(v => v.isSwipeAdjust) || null;
+
       refreshViaMarkers();
       renderViaInputs();
-      calculateRouteAndFuelPlan(true);
+      await updateRouteGeometryFast();
       showToast("↩️ 直前のスワイプ修正を取り消しました");
     }
 
@@ -4007,40 +4049,68 @@
       }
     }
 
-    // スワイプ操作でルートを曲げる：同じ区間ならピンを増やさず既存ピンを移動して再計算！
-    function applyRouteSwipeAdjustment(destLat, destLng, originLatLng = null) {
+    // 【超高速】スワイプ修正専用の軽量ルート形状更新（ガソリン探索は一切呼ばず0.1秒で即時更新！）
+    async function updateRouteGeometryFast() {
+      try {
+        const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
+        let pointSequence = [startPoint, ...validVias, endPoint];
+        if (isRoundTrip) pointSequence.push(startPoint);
+
+        const coordsStr = pointSequence.map(p => `${p.lng},${p.lat}`).join(';');
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=false`;
+
+        const res = await fetch(osrmUrl);
+        const data = await res.json();
+        if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          currentRouteData = route;
+
+          const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+          if (routePolyline) {
+            routePolyline.setLatLngs(latlngs);
+            routePolyline.bringToFront();
+            routePolyline.setStyle({ color: '#ea580c', weight: 14, opacity: 0.95 });
+          }
+
+          const totalDistKm = (route.distance / 1000).toFixed(1);
+          const totalDurationSeconds = route.duration;
+          const totalHours = Math.floor(totalDurationSeconds / 3600);
+          const totalMins = Math.round((totalDurationSeconds % 3600) / 60);
+          const durationText = totalHours > 0 ? `${totalHours}時間${totalMins}分` : `${totalMins}分`;
+
+          document.getElementById('routeTotalDist').textContent = `${totalDistKm} km`;
+          document.getElementById('routeTotalDuration').textContent = durationText;
+        }
+      } catch (err) {
+        console.warn("Fast route update failed:", err);
+      }
+    }
+
+    // スワイプ操作でルートを曲げる：ピンを増やさず、1個の調整ピンを指先に合わせてヌルヌル移動！
+    async function applyRouteSwipeAdjustment(destLat, destLng, originLatLng = null) {
       saveSwipeHistoryState();
 
       const vLat = parseFloat(destLat.toFixed(5));
       const vLng = parseFloat(destLng.toFixed(5));
       const vName = `ルート調整 (${vLat.toFixed(3)}, ${vLng.toFixed(3)})`;
 
-      // 1. 直前のスワイプで置いた調整ピンがある場合、その近隣（直線20km以内）の再スワイプは既存ピンを移動！
-      if (lastSwipeViaId !== null) {
-        const lastVia = viaPoints.find(v => v.id === lastSwipeViaId);
-        if (lastVia) {
-          const dFromLast = originLatLng 
-            ? haversineDistance(originLatLng.lat, originLatLng.lng, lastVia.lat, lastVia.lng)
-            : haversineDistance(vLat, vLng, lastVia.lat, lastVia.lng);
+      // 1. すでにこのスワイプセッションで置いた調整ピンがあれば、そのピンを移動するだけ！（ピンは絶対に増えない！）
+      if (swipeAdjustVia && viaPoints.some(v => v.id === swipeAdjustVia.id)) {
+        swipeAdjustVia.lat = vLat;
+        swipeAdjustVia.lng = vLng;
+        swipeAdjustVia.name = vName;
+        const inp = document.getElementById(`viaInput_${swipeAdjustVia.id}`);
+        if (inp) inp.value = vName;
+        if (swipeAdjustVia.marker) swipeAdjustVia.marker.setLatLng([vLat, vLng]);
 
-          if (dFromLast < 20000) { // 20km以内の微調整なら新しいピンを増やさず既存ピンを移動！
-            lastVia.lat = vLat;
-            lastVia.lng = vLng;
-            lastVia.name = vName;
-            const inp = document.getElementById(`viaInput_${lastVia.id}`);
-            if (inp) inp.value = vName;
-            if (lastVia.marker) lastVia.marker.setLatLng([vLat, vLng]);
-
-            refreshViaMarkers();
-            renderViaInputs();
-            calculateRouteAndFuelPlan(true);
-            showToast(`📍 調整ピンを移動しました（ピンは増えません）`);
-            return lastVia;
-          }
-        }
+        refreshViaMarkers();
+        renderViaInputs();
+        await updateRouteGeometryFast();
+        showToast("📍 ルートを曲げました（指を離して調整完了ボタンで給油所を確定）");
+        return swipeAdjustVia;
       }
 
-      // 2. スワイプ開始位置の近く（5km以内）に既存の経由地があれば、その経由地を移動！
+      // 2. スワイプ開始位置の近く（4km以内）に既存の経由地があれば、その経由地を移動！
       if (originLatLng) {
         let closestVia = null;
         let minD = Infinity;
@@ -4053,50 +4123,29 @@
             }
           }
         }
-        if (closestVia && minD < 5000) {
+        if (closestVia && minD < 4000) {
           closestVia.lat = vLat;
           closestVia.lng = vLng;
           closestVia.name = vName;
-          lastSwipeViaId = closestVia.id;
+          swipeAdjustVia = closestVia;
           const inp = document.getElementById(`viaInput_${closestVia.id}`);
           if (inp) inp.value = vName;
           if (closestVia.marker) closestVia.marker.setLatLng([vLat, vLng]);
 
           refreshViaMarkers();
           renderViaInputs();
-          calculateRouteAndFuelPlan(true);
-          showToast(`📍 既存の経由地を新しい道へ移動しました 🔄`);
+          await updateRouteGeometryFast();
+          showToast(`📍 経由地を新しい道へ移動しました 🔄`);
           return closestVia;
         }
       }
 
-      // 3. 別の区間をスワイプした場合
-      // 経由地上限に達している場合は、最も近いスワイプ調整ピンを移動して再利用！
+      // 3. 調整ピンがまだ無ければ、1個だけ新設して挿入！
       if (viaPoints.length >= MAX_VIA_POINTS) {
-        const swipeVias = viaPoints.filter(v => v.isSwipeAdjust);
-        if (swipeVias.length > 0 && originLatLng) {
-          let nearest = swipeVias[0];
-          let nd = Infinity;
-          swipeVias.forEach(v => {
-            const d = haversineDistance(originLatLng.lat, originLatLng.lng, v.lat, v.lng);
-            if (d < nd) { nd = d; nearest = v; }
-          });
-          nearest.lat = vLat;
-          nearest.lng = vLng;
-          nearest.name = vName;
-          lastSwipeViaId = nearest.id;
-          refreshViaMarkers();
-          renderViaInputs();
-          calculateRouteAndFuelPlan(true);
-          showToast(`⚠️ 経由地上限のため、最寄りの調整ピンを移動してルートを更新しました`);
-          return nearest;
-        } else {
-          showToast(`⚠️ 経由地は最大${MAX_VIA_POINTS}箇所までです。不要な経由地を削除してから追加してください。`);
-          return null;
-        }
+        showToast(`⚠️ 経由地は最大${MAX_VIA_POINTS}箇所までです。不要な経由地を削除してください。`);
+        return null;
       }
 
-      // 適切な順序で新規スワイプ調整ピンを挿入
       const coords = currentRouteData ? currentRouteData.geometry.coordinates : null;
       let insertIndex = viaPoints.length;
 
@@ -4126,13 +4175,13 @@
       const id = Date.now();
       const newVia = { id, lat: vLat, lng: vLng, name: vName, isSwipeAdjust: true, marker: null };
       viaPoints.splice(insertIndex, 0, newVia);
-      lastSwipeViaId = id;
+      swipeAdjustVia = newVia; // このセッションの調整ピンとして固定！
 
       refreshViaMarkers();
       renderViaInputs();
-      calculateRouteAndFuelPlan(true);
+      await updateRouteGeometryFast();
 
-      showToast(`🛣️ スワイプで道を曲げました！同じ場所をさらに引っ張るとピンを増やさず微調整できます 📍`);
+      showToast(`🛣️ ルートを曲げました！さらに引っ張るとこのピンが移動して微調整できます 📍`);
       return newVia;
     }
 
@@ -4151,10 +4200,10 @@
     let swipeOriginLatLng = null;
     let lastToggleEditModeTime = 0;
 
-    function toggleRouteEditMode(forceState = null) {
+    async function toggleRouteEditMode(forceState = null) {
       const now = Date.now();
       if (now - lastToggleEditModeTime < 350) {
-        return; // タッチ端末でのtouchstart/touchend/click二重発火を完全にガード
+        return; // タッチ端末での二重発火を完全にガード
       }
       lastToggleEditModeTime = now;
 
@@ -4169,6 +4218,7 @@
       const banner = document.getElementById('routeEditModeBanner');
 
       if (isRouteEditModeActive) {
+        swipeAdjustVia = null; // 開始時は調整ピンをクリア
         // 地図上フローティングボタンのアクティブ表示
         if (btn) {
           btn.classList.add('active');
@@ -4185,29 +4235,26 @@
         }
         if (banner) banner.classList.add('active');
         if (routePolyline) {
-          // スワイプしやすいようにオレンジ色の太線に変化し、最前面に表示
           routePolyline.bringToFront();
           routePolyline.setStyle({ color: '#ea580c', weight: 14, opacity: 0.95 });
         }
 
-        // スマホ画面でプランタブや設定タブが表示されている場合は、地図をすぐに操作できるよう地図タブに切り替え
         if (window.innerWidth <= 820) {
           switchMobileTab('map');
         }
 
         showToast("🖐️ スワイプ修正モード開始！オレンジ色のルート線を指で引っ張って走りたい道へ曲げてください");
       } else {
-        lastSwipeViaId = null; // 完了したので調整ピン追跡をリセット
-        swipeHistory = [];    // 履歴リセット
+        // スワイプ修正モード完了！ここで初めて確定ルートで給油所とタイムラインを一括確定！
+        swipeAdjustVia = null;
+        swipeHistory = [];
         updateUndoButtonState();
 
-        // 地図上フローティングボタンの通常表示
         if (btn) {
           btn.classList.remove('active');
           btn.innerHTML = `<span class="icon">🖐️</span> <span class="label">スワイプ修正</span>`;
           btn.style.display = 'inline-flex';
         }
-        // サイドバーボタンの通常表示
         if (sidebarBtn) {
           sidebarBtn.classList.remove('active');
           sidebarBtn.innerHTML = `<span>🖐️</span> <span>ルートをスワイプ修正する</span>`;
@@ -4219,7 +4266,17 @@
         if (routePolyline) {
           routePolyline.setStyle({ color: '#1a73e8', weight: 6, opacity: 0.85 });
         }
-        showToast("✓ スワイプ修正モードを完了しました");
+
+        // 確定したルートに基づいてガソリンスタンドと給油計画を一括再計算
+        showLoading("修正したルートで給油計画を確定中... ⛽");
+        try {
+          if (currentRouteData) {
+            await generateFuelPlanFromRoute(currentRouteData);
+          }
+        } finally {
+          hideLoading();
+        }
+        showToast("✓ スワイプ修正を確定し、給油計画を更新しました！ 🏍️");
       }
     }
 
@@ -4597,6 +4654,57 @@
     }
 
     // ==========================================
+    // Circuit / Loop Routing Helper (同じ道を通らない・周回優先)
+    // ==========================================
+    function selectBestCircuitRoute(routes) {
+      if (!routes || routes.length <= 1) return routes[0];
+
+      let bestRoute = routes[0];
+      let lowestOverlapScore = Infinity;
+
+      routes.forEach((r, idx) => {
+        const coords = r.geometry.coordinates; // [lng, lat]
+        if (!coords || coords.length < 15) return;
+
+        // ルートの前半（往路）と後半（復路）に分割
+        const mid = Math.floor(coords.length / 2);
+        const outbound = coords.slice(0, mid);
+        const inbound = coords.slice(mid);
+
+        // 復路の座標が往路の座標とどれくらい近い（同じ道を通っている）かをサンプリング
+        let overlapPoints = 0;
+        const sampleStep = Math.max(1, Math.floor(inbound.length / 30));
+        let sampledCount = 0;
+
+        for (let i = 0; i < inbound.length; i += sampleStep) {
+          sampledCount++;
+          const p = inbound[i];
+          let minD = Infinity;
+          for (let j = 0; j < outbound.length; j += Math.max(1, Math.floor(outbound.length / 50))) {
+            const d = haversineDistance(p[1], p[0], outbound[j][1], outbound[j][0]);
+            if (d < minD) minD = d;
+            if (minD < 180) break; // 180m以内なら同一道路（逆走・往復ピストン）と判定
+          }
+          if (minD < 180) {
+            overlapPoints++;
+          }
+        }
+
+        const overlapRate = sampledCount > 0 ? (overlapPoints / sampledCount) : 1;
+        // 重複率が低く、かつ極端に長すぎないルートを最良と判定
+        const distRatio = r.distance / routes[0].distance;
+        const score = overlapRate + (distRatio > 1.45 ? (distRatio - 1.45) * 2 : 0);
+
+        if (score < lowestOverlapScore) {
+          lowestOverlapScore = score;
+          bestRoute = r;
+        }
+      });
+
+      return bestRoute;
+    }
+
+    // ==========================================
     // Route Calculation (OSRM)
     // ==========================================
     async function calculateRouteAndFuelPlan(preserveEditMode = false) {
@@ -4647,7 +4755,7 @@
         }
 
         const coordsStr = pointSequence.map(p => `${p.lng},${p.lat}`).join(';');
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true&alternatives=3`;
 
         const res = await fetch(osrmUrl);
         const data = await res.json();
@@ -4656,7 +4764,13 @@
           throw new Error("ルートが検索できませんでした。経由地が孤立していないかご確認ください。");
         }
 
-        const route = data.routes[0];
+        let route = data.routes[0];
+
+        // 【同じ道を通らない（周回・ループ優先）】が有効な場合、重複が最小の周回ルートを自動選定
+        if (isAvoidSameRoadEnabled && data.routes.length > 1) {
+          route = selectBestCircuitRoute(data.routes);
+        }
+
         currentRouteData = route;
 
         const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
@@ -4712,7 +4826,12 @@
         const btnEdit = document.getElementById('btnRouteEditMode');
         if (btnEdit) btnEdit.style.display = 'inline-flex';
 
-        await generateFuelPlanFromRoute(route, totalDurationSeconds);
+        // スワイプ修正中は重たいガソリンスタンド探索をスキップして爆速化！完了ボタンを押した時に一括確定する
+        if (!wasEditMode) {
+          await generateFuelPlanFromRoute(route, totalDurationSeconds);
+        } else {
+          document.getElementById('routeFuelStopsCount').textContent = '修正中 (完了時に確定)';
+        }
 
         // ピンモードで計算した場合、結果画面（プランタブ）を見せるため通常レイアウトに復帰
         if (!wasEditMode && document.body.classList.contains('pin-layout-active')) {
