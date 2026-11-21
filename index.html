@@ -1440,6 +1440,53 @@
       display: none;
     }
 
+    /* Map Undo / Redo Floating Action Bar */
+    .map-undo-redo-bar {
+      position: absolute;
+      top: 12px;
+      left: 60px;
+      z-index: 3000 !important;
+      display: inline-flex;
+      gap: 5px;
+      background: #ffffff;
+      padding: 4px 6px;
+      border-radius: 20px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+      border: 1px solid #cbd5e1;
+      pointer-events: auto !important;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .btn-undo-redo {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-undo-redo:hover:not(:disabled) {
+      background: #e2e8f0;
+      color: #0f172a;
+      transform: translateY(-1px);
+    }
+    .btn-undo-redo:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+    .btn-undo-redo:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: #e2e8f0;
+      background: #f1f5f9;
+    }
+
     /* GPS Locate Floating Button on Map */
     .btn-gps-locate {
       position: absolute;
@@ -2505,6 +2552,16 @@
 
   <!-- Map Container -->
   <main id="map">
+    <!-- Map Undo / Redo Floating Action Bar -->
+    <div id="mapUndoRedoBar" class="map-undo-redo-bar" title="ピンの配置を取り消す・やり直す">
+      <button type="button" id="btnMapUndo" class="btn-undo-redo" onclick="undoPin()" title="1つ前のピン配置に戻す" disabled>
+        <span>↩️</span> <span>戻す</span>
+      </button>
+      <button type="button" id="btnMapRedo" class="btn-undo-redo" onclick="redoPin()" title="取り消したピン配置をやり直す" disabled>
+        <span>↪️</span> <span>進む</span>
+      </button>
+    </div>
+
     <!-- Pin Drop Guidance Banner on Map -->
     <div id="pinModeBanner" class="pin-mode-banner">
       <div style="display:flex; align-items:center; gap:6px;">
@@ -3239,6 +3296,7 @@
       // 【超重要】Leafletコンテナ内のUI要素（ボタン・バナー）のクリック・タッチ伝播を確実に無効化
       // これを行わないとLeafletがイベントを吸い取ってしまい、地図上のボタンクリック・タップが一切効かなくなる
       const mapOverlayControls = [
+        document.getElementById('mapUndoRedoBar'),
         document.getElementById('btnRouteEditMode'),
         document.getElementById('routeEditModeBanner'),
         document.getElementById('btnUndoSwipe'),
@@ -3253,6 +3311,9 @@
           L.DomEvent.disableScrollPropagation(el);
         }
       });
+
+      // 初期ピン状態を履歴スタックに記録
+      savePinHistory();
     }
 
     // ==========================================
@@ -3616,49 +3677,188 @@
     }
 
     // ==========================================
-    // Map Click Handler (Target-aware)
+    // Pin History System (Undo / Redo 戻る・進む)
+    // ==========================================
+    let pinHistory = [];
+    let pinHistoryIndex = -1;
+    const MAX_PIN_HISTORY = 40;
+
+    function savePinHistory() {
+      if (pinHistoryIndex < pinHistory.length - 1) {
+        pinHistory = pinHistory.slice(0, pinHistoryIndex + 1);
+      }
+
+      const snapshot = {
+        start: startPoint ? { ...startPoint } : null,
+        end: endPoint ? { ...endPoint } : null,
+        vias: viaPoints.map(v => ({ id: v.id, lat: v.lat, lng: v.lng, name: v.name }))
+      };
+
+      pinHistory.push(snapshot);
+      if (pinHistory.length > MAX_PIN_HISTORY) {
+        pinHistory.shift();
+      } else {
+        pinHistoryIndex++;
+      }
+      updateHistoryButtonsUI();
+    }
+
+    function undoPin() {
+      if (pinHistoryIndex <= 0) {
+        showToast("これ以上戻せません ⚠️");
+        return;
+      }
+      pinHistoryIndex--;
+      restorePinSnapshot(pinHistory[pinHistoryIndex]);
+      showToast("↩️ 1つ前のピン状態に戻しました");
+    }
+
+    function redoPin() {
+      if (pinHistoryIndex >= pinHistory.length - 1) {
+        showToast("これ以上進めません ⚠️");
+        return;
+      }
+      pinHistoryIndex++;
+      restorePinSnapshot(pinHistory[pinHistoryIndex]);
+      showToast("↪️ やり直しました");
+    }
+
+    function updateHistoryButtonsUI() {
+      const btnUndo = document.getElementById('btnMapUndo');
+      const btnRedo = document.getElementById('btnMapRedo');
+      if (btnUndo) {
+        btnUndo.disabled = (pinHistoryIndex <= 0);
+      }
+      if (btnRedo) {
+        btnRedo.disabled = (pinHistoryIndex >= pinHistory.length - 1);
+      }
+    }
+
+    function restorePinSnapshot(snap) {
+      if (!snap) return;
+
+      // 1. 出発地の復元
+      if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+      if (snap.start) {
+        startPoint = { ...snap.start };
+        document.getElementById('startInput').value = startPoint.name;
+        updateStatusBadge('start', 'ok');
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="custom-pin start" title="出発地 (ドラッグで移動可能)">発</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+        startMarker = L.marker([startPoint.lat, startPoint.lng], { icon, draggable: true }).addTo(map)
+          .bindPopup(`<b>🟢 出発地</b><br>${startPoint.name}`);
+        startMarker.on('dragend', function(e) {
+          const pos = e.target.getLatLng();
+          startPoint.lat = parseFloat(pos.lat.toFixed(5));
+          startPoint.lng = parseFloat(pos.lng.toFixed(5));
+          startPoint.name = `地点 (${startPoint.lat.toFixed(3)}, ${startPoint.lng.toFixed(3)})`;
+          document.getElementById('startInput').value = startPoint.name;
+          savePinHistory();
+          if (currentRouteData && endPoint && endPoint.lat) calculateRouteAndFuelPlan();
+        });
+      } else {
+        startPoint = null;
+        document.getElementById('startInput').value = '';
+        updateStatusBadge('start', '');
+      }
+
+      // 2. 目的地の復元
+      if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
+      if (snap.end) {
+        endPoint = { ...snap.end };
+        document.getElementById('endInput').value = endPoint.name;
+        updateStatusBadge('end', 'ok');
+        const label = isRoundTrip ? "折" : "着";
+        const title = isRoundTrip ? "折り返し地点" : "目的地";
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="custom-pin end" title="${title} (ドラッグで移動可能)">${label}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+        endMarker = L.marker([endPoint.lat, endPoint.lng], { icon, draggable: true }).addTo(map)
+          .bindPopup(`<b>🔴 ${title}</b><br>${endPoint.name}`);
+        endMarker.on('dragend', function(e) {
+          const pos = e.target.getLatLng();
+          endPoint.lat = parseFloat(pos.lat.toFixed(5));
+          endPoint.lng = parseFloat(pos.lng.toFixed(5));
+          endPoint.name = `地点 (${endPoint.lat.toFixed(3)}, ${endPoint.lng.toFixed(3)})`;
+          document.getElementById('endInput').value = endPoint.name;
+          savePinHistory();
+          if (currentRouteData && startPoint && startPoint.lat) calculateRouteAndFuelPlan();
+        });
+      } else {
+        endPoint = null;
+        document.getElementById('endInput').value = '';
+        updateStatusBadge('end', '');
+      }
+
+      // 3. 経由地の復元
+      viaPoints.forEach(v => { if (v.marker) map.removeLayer(v.marker); });
+      viaPoints = snap.vias.map(v => ({ id: v.id, lat: v.lat, lng: v.lng, name: v.name, marker: null }));
+      refreshViaMarkers();
+      renderViaInputs();
+
+      // ルートが表示されていた場合、点が変わったのでクリア
+      clearRouteVisualsOnly();
+      updateHistoryButtonsUI();
+    }
+
+    // ==========================================
+    // Map Click Handler (Target-aware & Streamlined)
     // ==========================================
     function handleMapClick(e) {
-      // 【最重要】経由地割り込み追加モード中は、地図タップでスマート割り込み追加を実行！
-      if (isRouteEditModeActive) {
-        handleTapInsertVia(e.latlng.lat, e.latlng.lng);
-        return;
+      // 【最重要 1】ルートがすでに描画されている場合:
+      // ユーザーが明示的に「修正モード（isRouteEditModeActive）」にしていない限り、
+      // 地図タップによる経由地追加は一切行わず、既存ルートも絶対に消去しない！（ズレ・誤操作完全防止！）
+      if (currentRouteData) {
+        if (isRouteEditModeActive) {
+          handleTapInsertVia(e.latlng.lat, e.latlng.lng);
+        }
+        return; // 修正モードがOFFなら何もしない
       }
 
       const lat = parseFloat(e.latlng.lat.toFixed(5));
       const lng = parseFloat(e.latlng.lng.toFixed(5));
       const coordName = `地点 (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
 
-      clearRouteVisualsOnly();
-
-      if (activeFocusTarget === 'start' || !startPoint) {
+      // 1. 出発地が未設定、または出発地ピンモードの場合
+      if (!startPoint || activeFocusTarget === 'start') {
         setStartPoint(lat, lng, coordName);
-        showToast("出発地を設定しました 🟢 続いて目的地をタップしてください");
-        startPinDropFor('end');
-      } else if (activeFocusTarget === 'end' || !endPoint) {
-        setEndPoint(lat, lng, coordName);
-        showToast("目的地を設定しました 🔴 「🚀 ルート計算」で経路を作成できます");
-        const banner = document.getElementById('pinModeBanner');
-        const text = document.getElementById('pinModeBannerText');
-        if (banner && text) {
-          text.textContent = `📍 地図タップで【経由地】を追加、または「🚀 ルート計算」をタップ`;
-          banner.classList.add('active');
-        }
         activeFocusTarget = null;
-      } else if (activeFocusTarget && activeFocusTarget.startsWith('via_')) {
+        savePinHistory();
+        showToast("🟢 出発地を設定しました！続けて地図タップで経由地を置けます");
+        return;
+      }
+
+      // 2. サイドバーで特定の入力欄（目的地または既存の特定経由地）が選択されている場合
+      if (activeFocusTarget === 'end') {
+        setEndPoint(lat, lng, coordName);
+        activeFocusTarget = null;
+        savePinHistory();
+        showToast("🔴 目的地を設定しました");
+        return;
+      }
+      if (activeFocusTarget && activeFocusTarget.startsWith('via_')) {
         const id = parseInt(activeFocusTarget.replace('via_', ''), 10);
         updateViaPointCoords(id, lat, lng, coordName);
-        showToast("経由地を地図から設定しました 🟡");
         activeFocusTarget = null;
-        document.getElementById('pinModeBanner')?.classList.remove('active');
+        savePinHistory();
+        showToast("🟡 経由地を更新しました");
+        return;
+      }
+
+      // 3. 通常タップ: 左のボタンを一切押さずにそのまま経由地1〜25をポンポン置ける！
+      if (viaPoints.length < MAX_VIA_POINTS) {
+        addViaPoint(lat, lng, coordName);
+        savePinHistory();
+        showToast(`🟡 経由地 #${viaPoints.length} を追加しました（タップで続けて追加可能）`);
       } else {
-        if (viaPoints.length < MAX_VIA_POINTS) {
-          addViaPoint(lat, lng, coordName);
-          showToast(`経由地 #${viaPoints.length} を追加しました 🟡`);
-        } else {
-          setEndPoint(lat, lng, coordName);
-          showToast("目的地(折り返し)を更新しました 🔴");
-        }
+        showToast(`⚠️ 経由地は最大${MAX_VIA_POINTS}箇所までです。「🚀 ルート計算」をタップしてください`);
       }
     }
 
@@ -3690,6 +3890,7 @@
         startPoint.lng = parseFloat(pos.lng.toFixed(5));
         startPoint.name = `地点 (${startPoint.lat.toFixed(3)}, ${startPoint.lng.toFixed(3)})`;
         document.getElementById('startInput').value = startPoint.name;
+        savePinHistory();
         if (currentRouteData && endPoint && endPoint.lat) {
           calculateRouteAndFuelPlan();
           showToast("出発地を移動してルートを再計算しました 🔄");
@@ -3730,6 +3931,7 @@
         endPoint.lng = parseFloat(pos.lng.toFixed(5));
         endPoint.name = `地点 (${endPoint.lat.toFixed(3)}, ${endPoint.lng.toFixed(3)})`;
         document.getElementById('endInput').value = endPoint.name;
+        savePinHistory();
         if (currentRouteData && startPoint && startPoint.lat) {
           calculateRouteAndFuelPlan();
           showToast("目的地のピンを移動してルートを再計算しました 🔄");
@@ -3881,6 +4083,7 @@
       viaPoints[index] = viaPoints[targetIndex];
       viaPoints[targetIndex] = temp;
 
+      savePinHistory();
       refreshViaMarkers();
       renderViaInputs();
       if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
@@ -3912,6 +4115,7 @@
               v.name = `地点 (${v.lat.toFixed(3)}, ${v.lng.toFixed(3)})`;
               const inp = document.getElementById(`viaInput_${v.id}`);
               if (inp) inp.value = v.name;
+              savePinHistory();
               if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
                 calculateRouteAndFuelPlan(isRouteEditModeActive);
                 showToast(`経由地 #${num} を移動してルートを再計算しました 🔄`);
@@ -3989,6 +4193,7 @@
       if (idx !== -1) {
         if (viaPoints[idx].marker) map.removeLayer(viaPoints[idx].marker);
         viaPoints.splice(idx, 1);
+        savePinHistory();
         refreshViaMarkers();
         renderViaInputs();
         if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
@@ -4135,6 +4340,7 @@
       const id = Date.now();
       const newVia = { id, lat: vLat, lng: vLng, name: vName, marker: null };
       viaPoints.splice(insertIndex, 0, newVia);
+      savePinHistory();
 
       refreshViaMarkers();
       renderViaInputs();
@@ -4267,13 +4473,13 @@
         }
       });
 
-      // ルートポリラインをクリックした場合も割り込み追加を実行
+      // ルートポリラインをクリックした場合
       polyline.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
-        if (!isRouteEditModeActive) {
-          toggleRouteEditMode(true);
+        // 【最重要】修正モードがONの時のみ割り込み追加を実行。OFFの時は勝手に追加しない（ズレ完全防止！）
+        if (isRouteEditModeActive) {
+          handleTapInsertVia(e.latlng.lat, e.latlng.lng);
         }
-        handleTapInsertVia(e.latlng.lat, e.latlng.lng);
       });
     }
 
@@ -4292,6 +4498,7 @@
       clearPoint('end');
       clearAllVias();
       clearRouteOverlays();
+      savePinHistory();
       map.setView([35.6812, 138.8], 8);
       showToast("すべてのピンとルートをリセットしました 🗑️");
     }
@@ -4563,45 +4770,61 @@
     // Route Calculation (OSRM)
     // ==========================================
     async function calculateRouteAndFuelPlan(preserveEditMode = false) {
+      if (isCalculatingRoute) {
+        console.warn("Route calculation already in progress. Ignoring duplicate trigger.");
+        return;
+      }
+      isCalculatingRoute = true;
+
       const wasEditMode = isRouteEditModeActive || preserveEditMode;
       showLoading(wasEditMode ? "割り込み追加したルートを再計算中..." : "ピン位置を確認中...");
 
-      const sText = document.getElementById('startInput').value.trim();
-      if (sText && (!startPoint || startPoint.name !== sText)) {
-        await searchGeocode('start', null, false);
-      }
-
-      const eText = document.getElementById('endInput').value.trim();
-      if (eText && (!endPoint || endPoint.name !== eText)) {
-        await searchGeocode('end', null, false);
-      }
-
-      for (const via of viaPoints) {
-        const inp = document.getElementById(`viaInput_${via.id}`);
-        const vText = inp ? inp.value.trim() : "";
-        if (vText && (!via.lat || via.name !== vText)) {
-          await searchGeocode('via', via.id, false);
-        }
-      }
-
-      hideLoading();
-
-      if (!startPoint || !startPoint.lat) {
-        alert("出発地が正しく設定されていません。地名を入力するか地図上をクリックしてください。");
-        document.getElementById('startInput').focus();
-        return;
-      }
-
-      if (!endPoint || !endPoint.lat) {
-        alert("目的地(折り返し)が正しく設定されていません。地名を入力するか地図上をクリックしてください。");
-        document.getElementById('endInput').focus();
-        return;
-      }
-
-      clearRouteVisualsOnly(wasEditMode);
-      showLoading(wasEditMode ? "割り込み追加したルートを再計算中..." : "OSRMでルートを算出中...");
-
       try {
+        const sText = document.getElementById('startInput').value.trim();
+        if (sText && (!startPoint || startPoint.name !== sText)) {
+          await searchGeocode('start', null, false);
+        }
+
+        const eText = document.getElementById('endInput').value.trim();
+        if (eText && (!endPoint || endPoint.name !== eText)) {
+          await searchGeocode('end', null, false);
+        }
+
+        for (const via of viaPoints) {
+          const inp = document.getElementById(`viaInput_${via.id}`);
+          const vText = inp ? inp.value.trim() : "";
+          if (vText && (!via.lat || via.name !== vText)) {
+            await searchGeocode('via', via.id, false);
+          }
+        }
+
+        if (!startPoint || !startPoint.lat) {
+          showToast("⚠️ 出発地が設定されていません。地図をタップして出発地を指定してください");
+          document.getElementById('startInput').focus();
+          return;
+        }
+
+        // 目的地が未設定の場合のスマートアシスト（最後の経由地を目的地に自動昇格）
+        if (!endPoint || !endPoint.lat) {
+          if (isRoundTrip) {
+            setEndPoint(startPoint.lat, startPoint.lng, startPoint.name);
+          } else if (viaPoints.length > 0) {
+            const lastVia = viaPoints.pop();
+            if (lastVia.marker) map.removeLayer(lastVia.marker);
+            setEndPoint(lastVia.lat, lastVia.lng, lastVia.name);
+            refreshViaMarkers();
+            renderViaInputs();
+            savePinHistory();
+            showToast(`🏁 最後の地点「${lastVia.name}」を目的地としてルート計算します 🚀`);
+          } else {
+            showToast("⚠️ 地図上をタップして目的地を設定してください 📍");
+            document.getElementById('endInput').focus();
+            return;
+          }
+        }
+
+        clearRouteVisualsOnly(wasEditMode);
+        showLoading(wasEditMode ? "割り込み追加したルートを再計算中..." : "OSRMでルートを算出中...");
         const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
         let pointSequence = [startPoint, ...validVias, endPoint];
 
@@ -4731,14 +4954,15 @@
 
       showLoading("給油ポイントと営業中スタンドを探索中...");
 
-      fuelMilestoneMarkers.forEach(m => map.removeLayer(m));
-      fuelMilestoneMarkers = [];
-      gasStationMarkers.forEach(m => map.removeLayer(m));
-      gasStationMarkers = [];
-      plannedStops = [];
+      try {
+        fuelMilestoneMarkers.forEach(m => map.removeLayer(m));
+        fuelMilestoneMarkers = [];
+        gasStationMarkers.forEach(m => map.removeLayer(m));
+        gasStationMarkers = [];
+        plannedStops = [];
 
-      const { safeTarget, maxRange } = updateFuelCalculations();
-      const coords = route.geometry.coordinates;
+        const { safeTarget, maxRange } = updateFuelCalculations();
+        const coords = route.geometry.coordinates;
       const totalDistMeters = route.distance;
 
       const timingStrategy = document.getElementById('settingGsTimingStrategy')?.value || 'early_smart';
@@ -4877,7 +5101,10 @@
         switchMobileTab('plan');
         showToast("給油計画とGoogleマップ連携が完成しました！⛽");
       }
+    } finally {
+      hideLoading();
     }
+  }
 
     function onGsFilterChange() {
       if (currentRouteData) {
@@ -6004,13 +6231,32 @@
       return R * c;
     }
 
+    let isCalculatingRoute = false;
+    let loadingWatchdogTimer = null;
+
     function showLoading(text) {
       document.getElementById('loadingText').textContent = text;
       document.getElementById('loadingOverlay').style.display = 'flex';
+
+      // 万が一の通信ハング・無限待機を防ぐ安全弁（10秒で強制解除）
+      if (loadingWatchdogTimer) clearTimeout(loadingWatchdogTimer);
+      loadingWatchdogTimer = setTimeout(() => {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay && overlay.style.display !== 'none') {
+          console.warn("Loading Watchdog Triggered: Force hiding stuck spinner.");
+          hideLoading();
+          showToast("⚠️ 通信がタイムアウトしたため処理を中断しました");
+        }
+      }, 10000);
     }
 
     function hideLoading() {
+      if (loadingWatchdogTimer) {
+        clearTimeout(loadingWatchdogTimer);
+        loadingWatchdogTimer = null;
+      }
       document.getElementById('loadingOverlay').style.display = 'none';
+      isCalculatingRoute = false;
     }
 
     function showToast(msg) {
