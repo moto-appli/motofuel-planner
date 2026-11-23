@@ -2709,6 +2709,16 @@
     let startMarker = null;
     let endMarker = null;
     let routePolyline = null;
+    let routePolylines = [];    // Array of L.polyline for colored multi-leg rendering
+    let currentLegsData = [];   // Array of calculated leg details
+    const LEG_COLORS = [
+      { name: '青 (ブルー)', hex: '#2563eb', bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8', btnBg: '#2563eb', btnHover: '#1d4ed8' },
+      { name: '橙 (オレンジ)', hex: '#ea580c', bg: '#fff7ed', border: '#fdba74', text: '#c2410c', btnBg: '#ea580c', btnHover: '#c2410c' },
+      { name: '緑 (グリーン)', hex: '#16a34a', bg: '#f0fdf4', border: '#86efac', text: '#15803d', btnBg: '#16a34a', btnHover: '#15803d' },
+      { name: '紫 (パープル)', hex: '#9333ea', bg: '#faf5ff', border: '#d8b4fe', text: '#7e22ce', btnBg: '#9333ea', btnHover: '#7e22ce' },
+      { name: '紅 (ピンク)', hex: '#db2777', bg: '#fdf2f8', border: '#f472b6', text: '#be185d', btnBg: '#db2777', btnHover: '#be185d' },
+      { name: '藍 (シアン)', hex: '#0891b2', bg: '#ecfeff', border: '#67e8f9', text: '#0e7490', btnBg: '#0891b2', btnHover: '#0e7490' }
+    ];
     let fuelMilestoneMarkers = [];
     let gasStationMarkers = [];
     let currentRouteData = null;
@@ -4460,10 +4470,16 @@
       const btnEdit = document.getElementById('btnRouteEditMode');
       if (btnEdit && !preserveEditMode) btnEdit.style.display = 'none';
 
-      if (routePolyline) {
+      if (routePolyline && !preserveEditMode) {
         map.removeLayer(routePolyline);
         routePolyline = null;
       }
+      routePolylines.forEach(p => {
+        if (p && map.hasLayer(p)) map.removeLayer(p);
+      });
+      routePolylines = [];
+      currentLegsData = [];
+
       fuelMilestoneMarkers.forEach(m => map.removeLayer(m));
       fuelMilestoneMarkers = [];
       gasStationMarkers.forEach(m => map.removeLayer(m));
@@ -4474,6 +4490,30 @@
         document.getElementById('planSection').style.display = 'none';
         document.getElementById('exportCard').style.display = 'none';
       }
+    }
+
+    function highlightLegOnMap(legIndex) {
+      routePolylines.forEach((p, i) => {
+        const leg = currentLegsData[i];
+        if (i === legIndex) {
+          p.setStyle({ weight: 12, opacity: 1.0 });
+          p.bringToFront();
+          try {
+            map.fitBounds(p.getBounds(), { padding: [50, 50], maxZoom: 14 });
+          } catch (e) {}
+        } else {
+          p.setStyle({ weight: 4, opacity: 0.35 });
+        }
+      });
+    }
+
+    function resetLegsHighlight() {
+      routePolylines.forEach((p, i) => {
+        const leg = currentLegsData[i];
+        if (leg) {
+          p.setStyle({ weight: 7, opacity: 0.9, color: leg.color.hex });
+        }
+      });
     }
 
     function clearRouteOverlays() {
@@ -5747,6 +5787,106 @@
         .map(i => sorted[i]);
     }
 
+    // ==========================================
+    // Multi-leg Route Builder & Colored Polyline Rendering
+    // ==========================================
+    function buildRouteLegs(startStop, intermediateStops, finalStop) {
+      const MAX_WAYPOINTS_PER_LEG = 8; // Googleマップは origin + destination + 最大8中継点
+      const legs = [];
+
+      let currentOrigin = startStop;
+      let remaining = [...intermediateStops];
+
+      while (remaining.length > 0) {
+        if (remaining.length <= MAX_WAYPOINTS_PER_LEG) {
+          const legIdx = legs.length;
+          const color = LEG_COLORS[legIdx % LEG_COLORS.length];
+          legs.push({
+            legNum: legIdx + 1,
+            color,
+            origin: currentOrigin,
+            waypoints: remaining,
+            destination: finalStop
+          });
+          break;
+        } else {
+          const waypoints = remaining.slice(0, 7);
+          const destination = remaining[7];
+          const legIdx = legs.length;
+          const color = LEG_COLORS[legIdx % LEG_COLORS.length];
+          legs.push({
+            legNum: legIdx + 1,
+            color,
+            origin: currentOrigin,
+            waypoints: waypoints,
+            destination: destination
+          });
+          currentOrigin = destination;
+          remaining = remaining.slice(8);
+        }
+      }
+
+      if (legs.length === 0) {
+        legs.push({
+          legNum: 1,
+          color: LEG_COLORS[0],
+          origin: startStop,
+          waypoints: [],
+          destination: finalStop
+        });
+      }
+
+      return legs;
+    }
+
+    // 地図上に分割区間ごとの色分けポリラインを描画（青・橙・緑...で美しく可視化！）
+    function drawMultiLegPolylines(legs, coords) {
+      routePolylines.forEach(p => {
+        if (p && map.hasLayer(p)) map.removeLayer(p);
+      });
+      routePolylines = [];
+
+      if (!legs || legs.length === 0 || !coords || coords.length === 0) return;
+
+      legs.forEach((leg, idx) => {
+        const color = leg.color;
+        const startIdx = Math.min(leg.origin.coordIndex, leg.destination.coordIndex);
+        const endIdx = Math.max(leg.origin.coordIndex, leg.destination.coordIndex);
+
+        let legSlice = coords.slice(startIdx, endIdx + 1).map(c => [c[1], c[0]]);
+        if (legSlice.length < 2) {
+          legSlice = [[leg.origin.lat, leg.origin.lng], [leg.destination.lat, leg.destination.lng]];
+        }
+
+        const poly = L.polyline(legSlice, {
+          color: color.hex,
+          weight: 7,
+          opacity: 0.9,
+          lineJoin: 'round',
+          lineCap: 'round'
+        }).addTo(map);
+
+        const legTitle = legs.length > 1 ? `【第${idx + 1}区間 (${color.name})】` : '【全行程ルート】';
+        poly.bindTooltip(`
+          <div style="font-size:0.75rem; font-weight:bold; color:${color.text};">
+            ${legTitle}<br>
+            <span style="color:#334155; font-weight:normal;">${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}</span>
+          </div>
+        `, { sticky: true, opacity: 0.95 });
+
+        poly.on('click', () => {
+          highlightLegOnMap(idx);
+        });
+
+        routePolylines.push(poly);
+      });
+
+      // 単一青線（ベースレイヤー）は隠して色分けポリラインを前面に表示
+      if (routePolyline && !isRouteEditModeActive) {
+        routePolyline.setStyle({ opacity: 0, weight: 0 });
+      }
+    }
+
     function updateGoogleMapsExportLink() {
       const container = document.getElementById('gmapsExportContainer');
       if (!container) return;
@@ -5779,10 +5919,12 @@
         coordIndex: 0
       };
 
+      let lastSearchIdx = 0;
       const validVias = viaPoints
         .filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "")
         .map((v, i) => {
-          const idx = getRouteCoordIndex(v.lat, v.lng, 0, coords.length - 1);
+          const idx = getRouteCoordIndex(v.lat, v.lng, lastSearchIdx, coords.length - 1);
+          lastSearchIdx = Math.min(idx, coords.length - 1);
           return {
             type: 'via',
             name: `経由地 #${i + 1}: ${v.name}`,
@@ -5837,56 +5979,15 @@
         };
       });
 
-      // Google Maps URL limit: max 10 total stops (origin + destination + 8 intermediates)
-      const MAX_INTERMEDIATE_PER_LEG = 8;
-
-      const pruneMode = document.querySelector('input[name="gmapsPruneMode"]:checked')?.value || 'prune';
-
-      // 経由地スマート絞り込み（形状保持・屈曲点優先）
-      let viasToExport = viasForLegs;
-      let isPruned = false;
-      let originalViaCount = viasForLegs.length;
-
-      if (pruneMode === 'prune') {
-        const reservedSlots = gsStops.length;
-        const availableViaSlots = Math.max(1, MAX_INTERMEDIATE_PER_LEG - reservedSlots);
-
-        if (viasForLegs.length > availableViaSlots) {
-          viasToExport = pruneViaPointsForGmaps(viasForLegs, availableViaSlots, startStop, finalStop);
-          isPruned = true;
-        }
-      }
-
-      // 走行順（進捗インデックス）に厳密整列
-      let intermediateStops = [...viasToExport, ...gsStops];
+      // 全地点を間引きゼロで走行順にソート！
+      let intermediateStops = [...viasForLegs, ...gsStops];
       intermediateStops.sort((a, b) => a.coordIndex - b.coordIndex);
 
-      const allOrderedStops = [startStop, ...intermediateStops, finalStop];
+      // Googleマップの10地点制限に合わせて各区間（Leg）に分割
+      currentLegsData = buildRouteLegs(startStop, intermediateStops, finalStop);
 
-      // 絞り込みモード切り替えバーのHTML
-      const pruneToggleBarHtml = `
-        <div style="margin-bottom: 8px; background: #ffffff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
-          <span style="font-size:0.7rem; font-weight:700; color:#475569;">Googleマップ出力:</span>
-          <div style="display:flex; gap:10px; font-size:0.72rem;">
-            <label style="cursor:pointer; display:flex; align-items:center; gap:4px;">
-              <input type="radio" name="gmapsPruneMode" value="prune" ${pruneMode === 'prune' ? 'checked' : ''} onchange="updateGoogleMapsExportLink()" />
-              <span style="font-weight:700; color:#ea580c;">🎯 主要キーポイント1本化 (屈曲点優先)</span>
-            </label>
-            <label style="cursor:pointer; display:flex; align-items:center; gap:4px;">
-              <input type="radio" name="gmapsPruneMode" value="split" ${pruneMode === 'split' ? 'checked' : ''} onchange="updateGoogleMapsExportLink()" />
-              <span style="color:#2563eb; font-weight:700;">🚀 ズレ0%！分割ナビ (全地点100%保持)</span>
-            </label>
-          </div>
-        </div>
-      `;
-
-      // 絞り込み案内バッジ
-      const pruneNoticeBadgeHtml = isPruned ? `
-        <div style="margin-bottom: 8px; background: #fff7ed; border: 1px solid #fdba74; padding: 6px 10px; border-radius: 6px; font-size: 0.72rem; color: #9a3412; display:flex; align-items:center; gap:6px;">
-          <span>💡</span>
-          <span>Googleマップの10地点上限に合わせ、半島の先端や峠などルート形状を決定づける主要 <strong>${viasToExport.length}箇所</strong> ＋ 給油所 <strong>${gsStops.length}箇所</strong> を最優先選抜しました（全地点を一切間引かずにナビしたい場合は「ズレ0%！分割ナビ」をお選びください）</span>
-        </div>
-      ` : '';
+      // 地図上に各区間の色分けポリライン（青・橙・緑...）を描画！
+      drawMultiLegPolylines(currentLegsData, coords);
 
       // Googleマップに渡す地点パラメータ（ズレ0%のため、常に純粋な厳密座標を渡す！）
       function getStopGmapsParam(s) {
@@ -5931,7 +6032,7 @@
       function renderStopsPinListHtml(stops) {
         return `
           <div style="margin: 8px 0; font-size: 0.74rem; background: #ffffff; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <div style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 0.7rem;">📍 Googleマップ上の経由地一覧:</div>
+            <div style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 0.7rem;">📍 この区間の通過地点一覧:</div>
             ${stops.map((s, idx) => {
               const letter = pinLetters[idx] || `${idx + 1}`;
               const isGs = s.type === 'gs';
@@ -5949,25 +6050,25 @@
         `;
       }
 
-      if (intermediateStops.length <= MAX_INTERMEDIATE_PER_LEG) {
-        // Single Leg — all stops fit within Google Maps 10-point limit
-        const url = buildLegUrl(startStop, intermediateStops, finalStop);
-        const webUrl = buildWebSlashUrl(startStop, intermediateStops, finalStop);
-        const totalPins = 2 + intermediateStops.length;
-        const gsCount = intermediateStops.filter(s => s.type === 'gs').length;
+      // 1区間に収まる場合（中継点8個以下）
+      if (currentLegsData.length === 1) {
+        const leg = currentLegsData[0];
+        const allStops = [leg.origin, ...leg.waypoints, leg.destination];
+        const url = buildLegUrl(leg.origin, leg.waypoints, leg.destination);
+        const webUrl = buildWebSlashUrl(leg.origin, leg.waypoints, leg.destination);
+        const totalPins = allStops.length;
+        const gsCount = leg.waypoints.filter(s => s.type === 'gs').length;
 
         container.innerHTML = `
-          ${pruneToggleBarHtml}
-          ${pruneNoticeBadgeHtml}
-          <div class="leg-card" style="border-color:#93c5fd; background:#f0f9ff;">
-            <div class="leg-card-header">
-              <span class="leg-badge">全行程ルート</span>
-              <span class="leg-stop-count">📍 合計 ${totalPins} 地点 (給油スタンド ${gsCount} 箇所含む)</span>
+          <div class="leg-card" style="border-color:${leg.color.border}; background:${leg.color.bg};">
+            <div class="leg-card-header" style="border-bottom: 2px solid ${leg.color.border}; padding-bottom: 6px;">
+              <span class="leg-badge" style="background:${leg.color.btnBg}; color:#ffffff;">全行程ルート (${leg.color.name})</span>
+              <span class="leg-stop-count">📍 合計 ${totalPins} 地点 / ⛽ ${gsCount} 給油所</span>
             </div>
-            <div class="leg-route-title">${escapeXml(startStop.name)} ➜ ${escapeXml(finalStop.name)}</div>
-            ${renderStopsPinListHtml(allOrderedStops)}
+            <div class="leg-route-title" style="margin: 6px 0; font-weight:bold; color:#1e293b;">${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}</div>
+            ${renderStopsPinListHtml(allStops)}
             <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:8px;">
-              <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" style="flex:1; min-width:200px;">
+              <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" style="flex:1; min-width:200px; background:${leg.color.btnBg};">
                 <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
                 <span>🚗 Googleマップで開く (車ナビ確定)</span>
               </a>
@@ -5979,82 +6080,57 @@
           </div>
         `;
       } else {
-        // Multi-leg: split into chunks of MAX_INTERMEDIATE_PER_LEG each
-        // Each leg: origin → [up to 8 intermediate stops] → destination
-        // The destination of one leg becomes the origin of the next
-        const legs = [];
-        let currentOrigin = startStop;
-        let remainingIntermediates = [...intermediateStops];
-
-        while (remainingIntermediates.length > 0) {
-          if (remainingIntermediates.length <= MAX_INTERMEDIATE_PER_LEG) {
-            // Last leg — remaining stops all fit
-            legs.push({
-              origin: currentOrigin,
-              waypoints: remainingIntermediates,
-              destination: finalStop
-            });
-            break;
-          } else {
-            // Take up to MAX_INTERMEDIATE_PER_LEG stops for this leg
-            // The (MAX_INTERMEDIATE_PER_LEG)-th stop becomes the destination of this leg
-            // and the origin of the next
-            const legWaypoints = remainingIntermediates.slice(0, MAX_INTERMEDIATE_PER_LEG - 1);
-            const legDest = remainingIntermediates[MAX_INTERMEDIATE_PER_LEG - 1];
-            legs.push({
-              origin: currentOrigin,
-              waypoints: legWaypoints,
-              destination: legDest
-            });
-            currentOrigin = legDest;
-            remainingIntermediates = remainingIntermediates.slice(MAX_INTERMEDIATE_PER_LEG);
-          }
-        }
-
-        const badgeColors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899'];
-        const badgeTextColors = ['#fff','#fff','#fff','#fff','#fff','#fff'];
-
+        // 複数区間に分割される場合（2分割、3分割、4分割...）
         let html = `
-          ${pruneToggleBarHtml}
-          ${pruneNoticeBadgeHtml}
-          <div class="multi-leg-notice">
-            <span>💡</span>
-            <div>
-              経由地＋給油所が<strong>合計 ${2 + intermediateStops.length} 地点</strong>あり、Googleマップの仕様(最大10地点)を超えるため<strong>【ルート1】〜【ルート${legs.length}】</strong>に自動分割しました。<br>
-              <span style="color:#059669;font-weight:600;">⛽ 給油スタンドも各区間の中継地点（ピン）として確実に組み込まれています。</span><br>
-              区間ごとに順番にGoogleマップを開いてナビを開始できます。
+          <div class="multi-leg-notice" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; margin-bottom:12px;">
+            <div style="display:flex; align-items:flex-start; gap:8px;">
+              <span style="font-size:1.1rem;">🗺️</span>
+              <div>
+                <div style="font-weight:700; color:#1e40af; font-size:0.8rem; margin-bottom:2px;">
+                  ルート色分け分割ナビ（全地点100%完全再現・ズレ0%！）
+                </div>
+                <div style="font-size:0.72rem; color:#334155; line-height:1.4;">
+                  経由地＋給油所が<strong>合計 ${2 + intermediateStops.length} 地点</strong>あるため、Googleマップの仕様(最大10地点)に合わせて<strong>【第1区間】〜【第${currentLegsData.length}区間】</strong>に自動分割しました。<br>
+                  <strong style="color:#2563eb;">地図上の線の色（青・橙・緑...）と完全に連動</strong>しています。順番にGoogleマップを開いてナビを開始できます。
+                </div>
+              </div>
             </div>
           </div>
-          <div class="multi-leg-list">
+          <div class="multi-leg-list" style="display:flex; flex-direction:column; gap:12px;">
         `;
 
-        legs.forEach((leg, idx) => {
-          const legNum = idx + 1;
-          const color = badgeColors[(legNum - 1) % badgeColors.length];
-          const textColor = badgeTextColors[(legNum - 1) % badgeTextColors.length];
-          const legPhase = legNum === 1 ? '前半' : (legNum === legs.length ? '後半' : `中盤${legNum - 1}`);
+        currentLegsData.forEach((leg, idx) => {
+          const legNum = leg.legNum;
+          const color = leg.color;
           const url = buildLegUrl(leg.origin, leg.waypoints, leg.destination);
           const webUrl = buildWebSlashUrl(leg.origin, leg.waypoints, leg.destination);
-          const totalLegPins = 2 + leg.waypoints.length;
-
           const allLegStops = [leg.origin, ...leg.waypoints, leg.destination];
           const gsInLeg = leg.waypoints.filter(s => s.type === 'gs').length;
 
           html += `
-            <div class="leg-card">
-              <div class="leg-card-header">
-                <span class="leg-badge" style="background:${color};color:${textColor};">ルート${legNum} (${legPhase})</span>
-                <span class="leg-stop-count">📍 ${totalLegPins} 地点 / ⛽ ${gsInLeg} 給油所</span>
+            <div class="leg-card" style="border: 2px solid ${color.border}; background:${color.bg}; border-radius:8px; padding:10px;"
+                 onmouseenter="highlightLegOnMap(${idx})" onmouseleave="resetLegsHighlight()">
+              <div class="leg-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="leg-badge" style="background:${color.btnBg}; color:#ffffff; font-weight:700; padding:3px 8px; border-radius:4px; font-size:0.72rem;">
+                  第${legNum}区間 (${color.name})
+                </span>
+                <span class="leg-stop-count" style="font-size:0.7rem; color:#475569; font-weight:600;">
+                  📍 ${allLegStops.length} 地点 / ⛽ ${gsInLeg} 給油所
+                </span>
               </div>
-              <div class="leg-route-title">${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}</div>
+              <div class="leg-route-title" style="font-weight:700; font-size:0.78rem; color:#1e293b; margin-bottom:6px;">
+                ${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}
+              </div>
               ${renderStopsPinListHtml(allLegStops)}
-              <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:8px;">
-                <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" style="flex:1; min-width:200px;">
-                  <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-                  <span>🚗 Googleマップ【ルート${legNum}】を開く (車ナビ確定)</span>
+              <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+                <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" 
+                   style="flex:1; min-width:200px; background:${color.btnBg}; color:#ffffff; font-weight:700; text-decoration:none; padding:8px 12px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
+                  <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  <span>🚗 Googleマップ【第${legNum}区間 (${color.name})】を開く</span>
                 </a>
-                <button class="btn-leg-copy" data-copy-url="${url}">📋 URLコピー</button>
-                <a href="${webUrl}" target="_blank" rel="noopener" style="font-size:0.75rem; color:#475569; text-decoration:underline; display:inline-flex; align-items:center; padding:4px 8px; width:100%; justify-content:center;">
+                <button class="btn-leg-copy" data-copy-url="${url}" style="padding:6px 10px; font-size:0.72rem; cursor:pointer;">📋 URLコピー</button>
+                <button onclick="highlightLegOnMap(${idx})" style="padding:6px 10px; font-size:0.72rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;" title="地図上のこの区間を拡大表示">🔍 地図で見る</button>
+                <a href="${webUrl}" target="_blank" rel="noopener" style="font-size:0.72rem; color:#475569; text-decoration:underline; display:inline-flex; align-items:center; padding:3px 6px; width:100%; justify-content:center;">
                   🖥️ Webブラウザ用のピン一覧形式で開く
                 </a>
               </div>
