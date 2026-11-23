@@ -2117,9 +2117,9 @@
         <div class="route-mode-bar">
           <label class="toggle-roundtrip">
             <input type="checkbox" id="checkRoundTrip" onchange="onRoundTripToggle()" checked />
-            <span>🔄 往復ルートにする (発着同地点)</span>
+            <span>🔄 出発地に戻る (周回・一周ルート)</span>
           </label>
-          <span id="badgeRoundTrip" class="badge-roundtrip active">往復モード</span>
+          <span id="badgeRoundTrip" class="badge-roundtrip active">周回モード</span>
         </div>
 
         <!-- Waypoint Input Group -->
@@ -2128,7 +2128,7 @@
           <div class="point-row">
             <div class="point-dot start" onclick="startPinDropFor('start')" title="クリックで地図からピン指定">発</div>
             <div class="input-wrapper">
-              <input type="text" id="startInput" list="touringPlacesList" placeholder="出発地 (例: 東京駅、自宅、最寄りIC)" 
+              <input type="text" id="startInput" list="touringPlacesList" placeholder="出発地 (例: 自宅、最寄りIC、駅)" 
                      onfocus="onInputFocused('start')" onblur="handleInputBlur('start')"
                      onkeydown="handleInputKeydown(event, 'start')" oninput="onInputEdited('start')" />
               <span id="badge_start" class="input-status-badge empty">未設定</span>
@@ -2150,25 +2150,15 @@
             </button>
           </div>
 
-          <!-- Dynamic Via Points Container (2~3 points) -->
+          <!-- Dynamic Via Points Container (1~25 points) -->
           <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
             <!-- Rendered by JS -->
           </div>
 
-          <!-- Destination / Turnaround Point -->
-          <div class="point-row" style="margin-top: 2px;">
-            <div id="destDot" class="point-dot end" onclick="startPinDropFor('end')" title="クリックで地図からピン指定">折</div>
-            <div class="input-wrapper">
-              <input type="text" id="endInput" list="touringPlacesList" placeholder="目的地・折り返し (例: 志賀高原、伊豆、富士山)" 
-                     onfocus="onInputFocused('end')" onblur="handleInputBlur('end')"
-                     onkeydown="handleInputKeydown(event, 'end')" oninput="onInputEdited('end')" />
-              <span id="badge_end" class="input-status-badge empty">未設定</span>
-              <button class="btn-search-loc" onclick="searchGeocode('end', null, true)" title="検索・地図反映">🔍</button>
-            </div>
-            <button class="btn-set-pin-direct" onclick="startPinDropFor('end')" title="キーボードを開かずに地図タップで場所を指定">
-              <span>📍</span>
-            </button>
-            <button class="btn-del-point" onclick="clearPoint('end')" title="目的地をクリア">✖</button>
+          <!-- Hidden fallback for legacy endPoint input compatibility -->
+          <div id="endPointRow" style="display: none;">
+            <input type="hidden" id="endInput" value="" />
+            <span id="badge_end" class="input-status-badge empty" style="display:none;"></span>
           </div>
         </div>
 
@@ -3374,33 +3364,37 @@
     function saveCurrentRoute() {
       if (!startPoint || !startPoint.lat) {
         alert("保存する前に、出発地を入力または地図から指定してください。");
-        document.getElementById('startInput').focus();
+        document.getElementById('startInput')?.focus();
         return;
       }
-      if (!endPoint || !endPoint.lat) {
-        alert("保存する前に、目的地(折り返し地点)を入力または地図から指定してください。");
-        document.getElementById('endInput').focus();
-        return;
-      }
-
-      const defaultName = `${startPoint.name} ${isRoundTrip ? '⇄' : '➜'} ${endPoint.name}`;
-      const routeName = prompt("ルートの保存名を入力してください:", defaultName);
-      if (!routeName || !routeName.trim()) return;
-
-      const validVias = viaPoints
+      const savedVias = viaPoints
         .filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "")
         .map(v => ({ id: v.id, lat: v.lat, lng: v.lng, name: v.name }));
 
+      if (savedVias.length === 0) {
+        alert("保存する前に、経由地を地図上で1箇所以上指定してください。");
+        return;
+      }
+
+      const defaultEndName = isRoundTrip ? startPoint.name : savedVias[savedVias.length - 1].name;
+      const defaultName = `${startPoint.name} ${isRoundTrip ? '🔄 周回' : '➜'} ${defaultEndName}`;
+      const routeName = prompt("ルートの保存名を入力してください:", defaultName);
+      if (!routeName || !routeName.trim()) return;
+
       const totalDist = document.getElementById('routeTotalDist')?.textContent || "";
       const fuelCount = document.getElementById('routeFuelStopsCount')?.textContent || "";
+
+      const effectiveEndPoint = isRoundTrip
+        ? { lat: startPoint.lat, lng: startPoint.lng, name: `帰着 (${startPoint.name})` }
+        : { lat: savedVias[savedVias.length - 1].lat, lng: savedVias[savedVias.length - 1].lng, name: savedVias[savedVias.length - 1].name };
 
       const newRoute = {
         id: Date.now(),
         name: routeName.trim(),
         createdAt: new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         startPoint: { lat: startPoint.lat, lng: startPoint.lng, name: startPoint.name },
-        endPoint: { lat: endPoint.lat, lng: endPoint.lng, name: endPoint.name },
-        viaPoints: validVias,
+        endPoint: effectiveEndPoint,
+        viaPoints: savedVias,
         isRoundTrip,
         tankCapacity: document.getElementById('tankCapacity').value,
         fuelEconomy: document.getElementById('fuelEconomy').value,
@@ -3690,7 +3684,6 @@
 
       const snapshot = {
         start: startPoint ? { ...startPoint } : null,
-        end: endPoint ? { ...endPoint } : null,
         vias: viaPoints.map(v => ({ id: v.id, lat: v.lat, lng: v.lng, name: v.name }))
       };
 
@@ -3766,36 +3759,12 @@
         updateStatusBadge('start', '');
       }
 
-      // 2. 目的地の復元
+      // 2. 目的地のクリア（独立した「折」マーカーは完全廃止。片道時の着ピンは refreshViaMarkers で描画）
       if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
-      if (snap.end) {
-        endPoint = { ...snap.end };
-        document.getElementById('endInput').value = endPoint.name;
-        updateStatusBadge('end', 'ok');
-        const label = isRoundTrip ? "折" : "着";
-        const title = isRoundTrip ? "折り返し地点" : "目的地";
-        const icon = L.divIcon({
-          className: 'custom-div-icon',
-          html: `<div class="custom-pin end" title="${title} (ドラッグで移動可能)">${label}</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
-        endMarker = L.marker([endPoint.lat, endPoint.lng], { icon, draggable: true }).addTo(map)
-          .bindPopup(`<b>🔴 ${title}</b><br>${endPoint.name}`);
-        endMarker.on('dragend', function(e) {
-          const pos = e.target.getLatLng();
-          endPoint.lat = parseFloat(pos.lat.toFixed(5));
-          endPoint.lng = parseFloat(pos.lng.toFixed(5));
-          endPoint.name = `地点 (${endPoint.lat.toFixed(3)}, ${endPoint.lng.toFixed(3)})`;
-          document.getElementById('endInput').value = endPoint.name;
-          savePinHistory();
-          if (currentRouteData && startPoint && startPoint.lat) calculateRouteAndFuelPlan();
-        });
-      } else {
-        endPoint = null;
-        document.getElementById('endInput').value = '';
-        updateStatusBadge('end', '');
-      }
+      endPoint = null;
+      const endInp = document.getElementById('endInput');
+      if (endInp) endInp.value = '';
+      updateStatusBadge('end', '');
 
       // 3. 経由地の復元
       viaPoints.forEach(v => { if (v.marker) map.removeLayer(v.marker); });
@@ -3904,43 +3873,13 @@
     }
 
     function setEndPoint(lat, lng, name) {
+      if (endMarker) {
+        map.removeLayer(endMarker);
+        endMarker = null;
+      }
       endPoint = { lat, lng, name };
       const input = document.getElementById('endInput');
-      input.value = name;
-      input.classList.remove('error');
-      updateStatusBadge('end', 'ok');
-
-      if (endMarker) map.removeLayer(endMarker);
-
-      const label = isRoundTrip ? "折" : "着";
-      const title = isRoundTrip ? "折り返し地点" : "目的地";
-
-      const icon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div class="custom-pin end" title="${title} (ドラッグで移動可能)">${label}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
-      });
-
-      endMarker = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
-        .bindPopup(`<b>🔴 ${title}</b><br>${name}<br><small style="color:#64748b;">ドラッグして位置微調整可能</small>`);
-
-      endMarker.on('dragend', function(e) {
-        const pos = e.target.getLatLng();
-        endPoint.lat = parseFloat(pos.lat.toFixed(5));
-        endPoint.lng = parseFloat(pos.lng.toFixed(5));
-        endPoint.name = `地点 (${endPoint.lat.toFixed(3)}, ${endPoint.lng.toFixed(3)})`;
-        document.getElementById('endInput').value = endPoint.name;
-        savePinHistory();
-        if (currentRouteData && startPoint && startPoint.lat) {
-          calculateRouteAndFuelPlan();
-          showToast("目的地のピンを移動してルートを再計算しました 🔄");
-        } else {
-          clearRouteVisualsOnly();
-          showToast("目的地のピンを移動しました 📍");
-        }
-      });
-
+      if (input) input.value = name;
       clearRouteVisualsOnly();
     }
 
@@ -4096,14 +4035,21 @@
     }
 
     function refreshViaMarkers() {
+      const isOneWay = !isRoundTrip;
       viaPoints.forEach((v, i) => {
         const num = i + 1;
+        const isLastOfOneWay = isOneWay && (i === viaPoints.length - 1);
+
         if (v.lat !== null && v.lng !== null) {
+          const pinClass = isLastOfOneWay ? 'end' : 'via';
+          const pinText = isLastOfOneWay ? '着' : `経${num}`;
+          const pinTitle = isLastOfOneWay ? '最終目的地 (ドラッグで移動可能)' : `経由地 #${num} (ドラッグで移動可能)`;
+
           const icon = L.divIcon({
             className: 'custom-div-icon',
-            html: `<div class="custom-pin via" title="経由地 #${num} (ドラッグで移動可能)">経${num}</div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
+            html: `<div class="custom-pin ${pinClass}" title="${pinTitle}">${pinText}</div>`,
+            iconSize: isLastOfOneWay ? [30, 30] : [28, 28],
+            iconAnchor: isLastOfOneWay ? [15, 15] : [14, 14]
           });
 
           if (!v.marker) {
@@ -4116,7 +4062,7 @@
               const inp = document.getElementById(`viaInput_${v.id}`);
               if (inp) inp.value = v.name;
               savePinHistory();
-              if (currentRouteData && startPoint && endPoint && startPoint.lat && endPoint.lat) {
+              if (currentRouteData && startPoint && startPoint.lat) {
                 calculateRouteAndFuelPlan(isRouteEditModeActive);
                 showToast(`経由地 #${num} を移動してルートを再計算しました 🔄`);
               } else {
@@ -4129,9 +4075,10 @@
             v.marker.setLatLng([v.lat, v.lng]);
           }
 
+          const popupHeader = isLastOfOneWay ? `<b>🔴 最終目的地</b>` : `<b>🟡 経由地 #${num}</b>`;
           v.marker.bindPopup(`
             <div style="font-size:0.8rem; line-height:1.4;">
-              <b>🟡 経由地 #${num}</b><br>
+              ${popupHeader}<br>
               <div style="color:#334155; margin:3px 0;">${escapeXml(v.name)}</div>
               <div style="color:#64748b; font-size:0.7rem;">📍 ピンをドラッグして走りたい道へ移動可能</div>
               <button type="button" onclick="removeViaPoint(${v.id})" style="margin-top:6px; background:#fee2e2; border:1px solid #f87171; color:#b91c1c; border-radius:4px; font-size:0.7rem; padding:3px 8px; cursor:pointer; font-weight:600;">
@@ -4255,8 +4202,11 @@
     async function updateRouteGeometryFast() {
       try {
         const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
-        let pointSequence = [startPoint, ...validVias, endPoint];
-        if (isRoundTrip) pointSequence.push(startPoint);
+        if (!startPoint || (validVias.length === 0 && !isRoundTrip)) return;
+
+        let pointSequence = isRoundTrip
+          ? [startPoint, ...validVias, startPoint]
+          : [startPoint, ...validVias];
 
         const coordsStr = pointSequence.map(p => `${p.lng},${p.lat}`).join(';');
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=false`;
@@ -4644,28 +4594,26 @@
       const checkbox = document.getElementById('checkRoundTrip');
       isRoundTrip = checkbox.checked;
       const badge = document.getElementById('badgeRoundTrip');
-      const destDot = document.getElementById('destDot');
-      const endInput = document.getElementById('endInput');
 
-      if (isRoundTrip) {
-        badge.textContent = "往復モード";
-        badge.className = "badge-roundtrip active";
-        destDot.textContent = "折";
-        destDot.title = "折り返し地点";
-        endInput.placeholder = "目的地・折り返し (例: 志賀高原、伊豆、富士山)";
-      } else {
-        badge.textContent = "片道モード";
-        badge.className = "badge-roundtrip";
-        destDot.textContent = "着";
-        destDot.title = "目的地";
-        endInput.placeholder = "最終目的地 (例: 志賀高原、伊豆、富士山)";
+      if (badge) {
+        if (isRoundTrip) {
+          badge.textContent = "周回モード";
+          badge.className = "badge-roundtrip active";
+        } else {
+          badge.textContent = "片道モード";
+          badge.className = "badge-roundtrip";
+        }
       }
 
-      if (endPoint) {
-        setEndPoint(endPoint.lat, endPoint.lng, endPoint.name);
+      if (endMarker) {
+        map.removeLayer(endMarker);
+        endMarker = null;
       }
+      endPoint = null;
 
+      refreshViaMarkers();
       clearRouteVisualsOnly();
+      showToast(isRoundTrip ? "🔄 周回モード（最終経由地から出発地へ帰還）に設定しました" : "🏁 片道モード（最終経由地がゴール）に設定しました");
     }
 
     // ==========================================
@@ -4800,37 +4748,29 @@
 
         if (!startPoint || !startPoint.lat) {
           showToast("⚠️ 出発地が設定されていません。地図をタップして出発地を指定してください");
-          document.getElementById('startInput').focus();
+          document.getElementById('startInput')?.focus();
           return;
         }
 
-        // 目的地が未設定の場合のスマートアシスト（最後の経由地を目的地に自動昇格）
-        if (!endPoint || !endPoint.lat) {
-          if (isRoundTrip) {
-            setEndPoint(startPoint.lat, startPoint.lng, startPoint.name);
-          } else if (viaPoints.length > 0) {
-            const lastVia = viaPoints.pop();
-            if (lastVia.marker) map.removeLayer(lastVia.marker);
-            setEndPoint(lastVia.lat, lastVia.lng, lastVia.name);
-            refreshViaMarkers();
-            renderViaInputs();
-            savePinHistory();
-            showToast(`🏁 最後の地点「${lastVia.name}」を目的地としてルート計算します 🚀`);
-          } else {
-            showToast("⚠️ 地図上をタップして目的地を設定してください 📍");
-            document.getElementById('endInput').focus();
-            return;
-          }
+        const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
+        if (validVias.length === 0) {
+          showToast("⚠️ 立ち寄る地点（経由地）を地図上でタップして追加してください 📍");
+          return;
+        }
+
+        // 周回モード時は最終経由地から出発地へ帰還。片道モード時は最終経由地がゴール。
+        let pointSequence = [];
+        if (isRoundTrip) {
+          pointSequence = [startPoint, ...validVias, startPoint];
+          endPoint = { ...startPoint, name: `帰着 (${startPoint.name})` };
+        } else {
+          pointSequence = [startPoint, ...validVias];
+          const lastVia = validVias[validVias.length - 1];
+          endPoint = { ...lastVia, name: `目的地 (${lastVia.name})` };
         }
 
         clearRouteVisualsOnly(wasEditMode);
         showLoading(wasEditMode ? "割り込み追加したルートを再計算中..." : "OSRMでルートを算出中...");
-        const validVias = viaPoints.filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "");
-        let pointSequence = [startPoint, ...validVias, endPoint];
-
-        if (isRoundTrip) {
-          pointSequence.push(startPoint);
-        }
 
         const coordsStr = pointSequence.map(p => `${p.lng},${p.lat}`).join(';');
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true&alternatives=3`;
@@ -5739,36 +5679,78 @@
     // ==========================================
     // Google Maps Link Builder (Multi-leg Splitting & Smart Via Pruning)
     // ==========================================
-    // Googleマップの10地点制限に合わせて、ルート形状を維持する重要経由地をスマートに間引き・抽出する関数
-    function pruneViaPointsForGmaps(vias, maxSlots) {
+    function perpendicularDistance(p, a, b) {
+      const dx = b.lng - a.lng;
+      const dy = b.lat - a.lat;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return Math.hypot(p.lat - a.lat, p.lng - a.lng);
+      const num = Math.abs(dy * p.lng - dx * p.lat + b.lng * a.lat - b.lat * a.lng);
+      return num / Math.sqrt(lenSq);
+    }
+
+    // Googleマップの10地点制限に合わせて、半島の先端や峠のカーブなど「ルート形状を維持する最重要地点」を優先抽出！
+    // Douglas-Peucker (RDP) アルゴリズムを応用し、直線から最も突出しているキーポイントを貪欲法で選抜
+    function pruneViaPointsForGmaps(vias, maxSlots, originPt, destPt) {
       if (!vias || vias.length <= maxSlots) return vias;
       if (maxSlots <= 0) return [];
 
       const sorted = [...vias].sort((a, b) => a.coordIndex - b.coordIndex);
-      const selected = [];
-      const step = (sorted.length - 1) / Math.max(1, maxSlots - 1);
+      const selectedIndices = new Set();
 
-      for (let i = 0; i < maxSlots; i++) {
-        const targetIdx = Math.round(i * step);
-        const actualIdx = Math.min(sorted.length - 1, Math.max(0, targetIdx));
-        if (!selected.includes(sorted[actualIdx])) {
-          selected.push(sorted[actualIdx]);
+      function findMaxDistPoint(startIdx, endIdx) {
+        const ptA = startIdx === -1 ? originPt : sorted[startIdx];
+        const ptB = endIdx === sorted.length ? destPt : sorted[endIdx];
+        let maxDist = -1;
+        let maxIdx = -1;
+        for (let i = startIdx + 1; i < endIdx; i++) {
+          if (selectedIndices.has(i)) continue;
+          const d = perpendicularDistance(sorted[i], ptA, ptB);
+          if (d > maxDist) {
+            maxDist = d;
+            maxIdx = i;
+          }
+        }
+        return { idx: maxIdx, dist: maxDist };
+      }
+
+      for (let k = 0; k < maxSlots; k++) {
+        const currentPoints = [-1, ...Array.from(selectedIndices).sort((a, b) => a - b), sorted.length];
+        let best = null;
+
+        for (let j = 0; j < currentPoints.length - 1; j++) {
+          const segStart = currentPoints[j];
+          const segEnd = currentPoints[j + 1];
+          if (segEnd - segStart > 1) {
+            const candidate = findMaxDistPoint(segStart, segEnd);
+            if (candidate.idx !== -1 && (!best || candidate.dist > best.dist)) {
+              best = candidate;
+            }
+          }
+        }
+
+        if (best && best.idx !== -1) {
+          selectedIndices.add(best.idx);
+        } else {
+          break;
         }
       }
 
-      // 枠に余裕がある場合の補填
-      for (const v of sorted) {
-        if (selected.length >= maxSlots) break;
-        if (!selected.includes(v)) selected.push(v);
+      // スロットに余裕があれば残りの点を均等追加
+      if (selectedIndices.size < maxSlots) {
+        for (let i = 0; i < sorted.length && selectedIndices.size < maxSlots; i++) {
+          selectedIndices.add(i);
+        }
       }
 
-      return selected.sort((a, b) => a.coordIndex - b.coordIndex);
+      return Array.from(selectedIndices)
+        .sort((a, b) => sorted[a].coordIndex - sorted[b].coordIndex)
+        .map(i => sorted[i]);
     }
 
     function updateGoogleMapsExportLink() {
       const container = document.getElementById('gmapsExportContainer');
       if (!container) return;
-      if (!startPoint || !endPoint || !currentRouteData) {
+      if (!startPoint || !currentRouteData) {
         container.innerHTML = `<div style="font-size:0.75rem; color:#64748b; padding:4px 0;">ルート計算完了後にGoogleマップリンクが表示されます</div>`;
         return;
       }
@@ -5797,27 +5779,6 @@
         coordIndex: 0
       };
 
-      let turnaroundIdx = coords.length - 1;
-      let endStop = null;
-      if (isRoundTrip) {
-        turnaroundIdx = getRouteCoordIndex(endPoint.lat, endPoint.lng, 0, coords.length - 1);
-        endStop = {
-          type: 'turnaround',
-          name: `折り返し: ${endPoint.name}`,
-          lat: endPoint.lat,
-          lng: endPoint.lng,
-          coordIndex: turnaroundIdx
-        };
-      } else {
-        endStop = {
-          type: 'destination',
-          name: `目的地: ${endPoint.name}`,
-          lat: endPoint.lat,
-          lng: endPoint.lng,
-          coordIndex: coords.length - 1
-        };
-      }
-
       const validVias = viaPoints
         .filter(v => v.lat !== null && v.lng !== null && v.name.trim() !== "")
         .map((v, i) => {
@@ -5831,14 +5792,39 @@
           };
         });
 
+      // 周回・片道の終着地点を定義（折り返し地点「折」は完全廃止！）
+      let finalStop = null;
+      let viasForLegs = [...validVias];
+
+      if (isRoundTrip) {
+        // 周回モード: 最終経由地から出発地へ帰還
+        finalStop = {
+          type: 'destination',
+          name: `帰着: ${startPoint.name}`,
+          lat: startPoint.lat,
+          lng: startPoint.lng,
+          coordIndex: coords.length - 1
+        };
+      } else {
+        // 片道モード: 最終経由地がゴール
+        if (viasForLegs.length > 0) {
+          const last = viasForLegs.pop();
+          finalStop = {
+            type: 'destination',
+            name: `目的地: ${last.name.replace(/^経由地 #\d+:\s*/, '')}`,
+            lat: last.lat,
+            lng: last.lng,
+            coordIndex: last.coordIndex
+          };
+        } else {
+          finalStop = startStop;
+        }
+      }
+
       const gsStops = plannedStops.map(gs => {
         const idx = getRouteCoordIndex(gs.lat, gs.lng, 0, coords.length - 1);
         const roadLat = coords[idx][1];
         const roadLng = coords[idx][0];
-
-        // Googleマップに「店舗名」で正確に認識させるための検索クエリを生成！
-        // 実在店舗名（例: "ENEOS 屋島SS"）があればそれを最優先し、Googleマップ上で公式GSピンとしてヒットさせる
-        const gQuery = gs.googleSearchQuery || gs.realStoreName || (gs.name ? gs.name.replace('⛽ ', '') : 'ガソリンスタンド');
 
         return {
           type: 'gs',
@@ -5847,45 +5833,32 @@
           lng: parseFloat(roadLng.toFixed(5)),
           rawGsLat: gs.lat,
           rawGsLng: gs.lng,
-          googleSearchQuery: gQuery,
           coordIndex: idx
         };
       });
 
-      const finalStop = isRoundTrip ? {
-        type: 'destination',
-        name: `帰着: ${startPoint.name}`,
-        lat: startPoint.lat,
-        lng: startPoint.lng,
-        coordIndex: coords.length - 1
-      } : endStop;
-
       // Google Maps URL limit: max 10 total stops (origin + destination + 8 intermediates)
-      const MAX_INTERMEDIATE_PER_LEG = 8; // 8 intermediates = 10 total stops per leg
+      const MAX_INTERMEDIATE_PER_LEG = 8;
 
       const pruneMode = document.querySelector('input[name="gmapsPruneMode"]:checked')?.value || 'prune';
 
-      // 経由地スマート絞り込み（間引き）処理
-      let viasToExport = validVias;
+      // 経由地スマート絞り込み（形状保持・屈曲点優先）
+      let viasToExport = viasForLegs;
       let isPruned = false;
-      let originalViaCount = validVias.length;
+      let originalViaCount = viasForLegs.length;
 
       if (pruneMode === 'prune') {
-        const reservedSlots = gsStops.length + (isRoundTrip ? 1 : 0);
+        const reservedSlots = gsStops.length;
         const availableViaSlots = Math.max(1, MAX_INTERMEDIATE_PER_LEG - reservedSlots);
 
-        if (validVias.length > availableViaSlots) {
-          viasToExport = pruneViaPointsForGmaps(validVias, availableViaSlots);
+        if (viasForLegs.length > availableViaSlots) {
+          viasToExport = pruneViaPointsForGmaps(viasForLegs, availableViaSlots, startStop, finalStop);
           isPruned = true;
         }
       }
 
-      // Intermediate stops strictly ordered by route driving progression
+      // 走行順（進捗インデックス）に厳密整列
       let intermediateStops = [...viasToExport, ...gsStops];
-      if (isRoundTrip) {
-        intermediateStops.push(endStop);
-      }
-
       intermediateStops.sort((a, b) => a.coordIndex - b.coordIndex);
 
       const allOrderedStops = [startStop, ...intermediateStops, finalStop];
@@ -5893,60 +5866,48 @@
       // 絞り込みモード切り替えバーのHTML
       const pruneToggleBarHtml = `
         <div style="margin-bottom: 8px; background: #ffffff; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
-          <span style="font-size:0.7rem; font-weight:700; color:#475569;">Googleマップ経由地:</span>
+          <span style="font-size:0.7rem; font-weight:700; color:#475569;">Googleマップ出力:</span>
           <div style="display:flex; gap:10px; font-size:0.72rem;">
             <label style="cursor:pointer; display:flex; align-items:center; gap:4px;">
               <input type="radio" name="gmapsPruneMode" value="prune" ${pruneMode === 'prune' ? 'checked' : ''} onchange="updateGoogleMapsExportLink()" />
-              <span style="font-weight:700; color:#ea580c;">🎯 最適化 (主要ポイントに絞って1本化)</span>
+              <span style="font-weight:700; color:#ea580c;">🎯 主要キーポイント1本化 (屈曲点優先)</span>
             </label>
             <label style="cursor:pointer; display:flex; align-items:center; gap:4px;">
               <input type="radio" name="gmapsPruneMode" value="split" ${pruneMode === 'split' ? 'checked' : ''} onchange="updateGoogleMapsExportLink()" />
-              <span style="color:#64748b;">全地点を分割出力</span>
+              <span style="color:#2563eb; font-weight:700;">🚀 ズレ0%！分割ナビ (全地点100%保持)</span>
             </label>
           </div>
         </div>
       `;
 
-      // 絞り込み実行時の案内バッジ
+      // 絞り込み案内バッジ
       const pruneNoticeBadgeHtml = isPruned ? `
         <div style="margin-bottom: 8px; background: #fff7ed; border: 1px solid #fdba74; padding: 6px 10px; border-radius: 6px; font-size: 0.72rem; color: #9a3412; display:flex; align-items:center; gap:6px;">
           <span>💡</span>
-          <span>Googleマップの10地点上限に合わせて、経由地 <strong>${originalViaCount}箇所</strong> からルート形状を保つ主要 <strong>${viasToExport.length}箇所</strong> ＋ 給油所 <strong>${gsStops.length}箇所</strong> に絞り込んで1本化しました</span>
+          <span>Googleマップの10地点上限に合わせ、半島の先端や峠などルート形状を決定づける主要 <strong>${viasToExport.length}箇所</strong> ＋ 給油所 <strong>${gsStops.length}箇所</strong> を最優先選抜しました（全地点を一切間引かずにナビしたい場合は「ズレ0%！分割ナビ」をお選びください）</span>
         </div>
       ` : '';
 
-      // Googleマップに渡す地点パラメータ（設定に応じて座標渡し or 店舗名検索渡し）
+      // Googleマップに渡す地点パラメータ（ズレ0%のため、常に純粋な厳密座標を渡す！）
       function getStopGmapsParam(s) {
-        const mode = document.querySelector('input[name="gmapsWaypointMode"]:checked')?.value || 'exact_coords';
-        if (s.type === 'gs') {
-          if (mode === 'place_name' && s.googleSearchQuery) {
-            // 店名表示優先: Googleマップ上で店舗プレイスとして検索
-            return s.googleSearchQuery;
-          }
-          // 正確な位置優先（推奨・ズレ0%）: スタンドの正確な座標を直接渡す！
-          // これによりGoogleマップ側が勝手に別の店舗を選び直すことが一切なくなり、アプリの地図と100%一致します
-          return `${s.lat},${s.lng}`;
-        }
-        return `${s.lat},${s.lng}`;
+        return `${s.lat.toFixed(5)},${s.lng.toFixed(5)}`;
       }
 
       // Build a Google Maps URL:
-      // 公式APIディープリンク(travelmode=driving)を標準採用し、GSは店舗名でズバリ反映！
       function buildLegUrl(origin, waypoints, destination) {
         const params = new URLSearchParams();
         params.set('api', '1');
-        params.set('origin', `${origin.lat},${origin.lng}`);
-        params.set('destination', `${destination.lat},${destination.lng}`);
-        params.set('travelmode', 'driving'); // 車・バイクの運転モードを100%強制！(徒歩固定やフェリー誤誘導を完全防止)
+        params.set('origin', `${origin.lat.toFixed(5)},${origin.lng.toFixed(5)}`);
+        params.set('destination', `${destination.lat.toFixed(5)},${destination.lng.toFixed(5)}`);
+        params.set('travelmode', 'driving');
 
         if (waypoints && waypoints.length > 0) {
-          // ガソリンスタンドは店舗名で渡すことで、Googleマップが「公式GS店舗」として認識して経由地に登録！
           const wpStr = waypoints.map(w => getStopGmapsParam(w)).join('|');
           params.set('waypoints', wpStr);
         }
 
         if (highwayAvoidMode === 'avoid') {
-          params.set('avoid', 'highways,tolls'); // 下道優先(有料・高速回避)を確実に引き継ぐ
+          params.set('avoid', 'highways,tolls');
         }
 
         return `https://www.google.com/maps/dir/?${params.toString()}`;
