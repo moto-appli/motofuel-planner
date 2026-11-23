@@ -1016,19 +1016,6 @@
     }
 
     /* Multi-leg Google Maps UI */
-    .multi-leg-notice {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      border-radius: 7px;
-      padding: 8px 10px;
-      font-size: 0.72rem;
-      color: #92400e;
-      line-height: 1.4;
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
     .multi-leg-list {
       display: flex;
       flex-direction: column;
@@ -2149,55 +2136,56 @@
           <span id="badgeRoundTrip" class="badge-roundtrip active">周回モード</span>
         </div>
 
-        <!-- Waypoint Input Group -->
-        <div class="point-input-group">
-          <!-- Start Point -->
-          <div class="point-row">
-            <div class="point-dot start" onclick="startPinDropFor('start')" title="クリックで地図からピン指定">発</div>
-            <div class="input-wrapper">
-              <input type="text" id="startInput" list="touringPlacesList" placeholder="出発地 (例: 自宅、最寄りIC、駅)" 
-                     onfocus="onInputFocused('start')" onblur="handleInputBlur('start')"
-                     onkeydown="handleInputKeydown(event, 'start')" oninput="onInputEdited('start')" />
-              <span id="badge_start" class="input-status-badge empty">未設定</span>
-              <button class="btn-search-loc" onclick="searchGeocode('start', null, true)" title="検索・地図反映">🔍</button>
-            </div>
-            <button class="btn-set-pin-direct" onclick="startPinDropFor('start')" title="キーボードを開かずに地図タップで場所を指定">
-              <span>📍</span>
-            </button>
-            <button class="btn-del-point" onclick="clearPoint('start')" title="出発地をクリア">✖</button>
+        <!-- Waypoint Input Group (出発地・経由地をまとめてデフォルト省略表示！) -->
+        <div class="collapse-toggle-bar" onclick="toggleCollapse('collapsePoints')" style="margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>📍</span>
+            <span style="font-weight:700; color:#475569;">地点入力欄 (発・経由地)</span>
+            <span id="badgePointsSummary" class="collapse-summary-badge">発: 未設定 / 経由: 0箇所</span>
           </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
+            <span id="chevron_collapsePoints">▶ 開く</span>
+          </div>
+        </div>
 
-          <!-- Via Actions Bar (経由地リストの上に固定配置！連打してもボタン位置がズレない) -->
-          <div class="via-actions-row" style="margin: 6px 0 6px 0;">
-            <button id="btnAddVia" class="btn-add-via" onclick="addViaPointInput()" title="クリック連打で複数の経由地を一気に追加できます">
-              <span>➕</span> 経由地を追加 (最大25箇所)
-            </button>
-            <button id="btnClearVias" class="btn-clear-vias" onclick="clearAllVias()" style="display:none;">
-              経由地を全消去
-            </button>
-          </div>
+        <div id="collapsePoints" style="display:none; margin-top:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px;">
+          <div class="point-input-group">
+            <!-- Start Point -->
+            <div class="point-row">
+              <div class="point-dot start" onclick="startPinDropFor('start')" title="クリックで地図からピン指定">発</div>
+              <div class="input-wrapper">
+                <input type="text" id="startInput" list="touringPlacesList" placeholder="出発地 (例: 自宅、最寄りIC、駅)" 
+                       onfocus="onInputFocused('start')" onblur="handleInputBlur('start')"
+                       onkeydown="handleInputKeydown(event, 'start')" oninput="onInputEdited('start')" />
+                <span id="badge_start" class="input-status-badge empty">未設定</span>
+                <button class="btn-search-loc" onclick="searchGeocode('start', null, true)" title="検索・地図反映">🔍</button>
+              </div>
+              <button class="btn-set-pin-direct" onclick="startPinDropFor('start')" title="キーボードを開かずに地図タップで場所を指定">
+                <span>📍</span>
+              </button>
+              <button class="btn-del-point" onclick="clearPoint('start')" title="出発地をクリア">✖</button>
+            </div>
 
-          <!-- Dynamic Via Points Container (デフォルトは省略表示！ピン打ち重視で画面スッキリ) -->
-          <div class="collapse-toggle-bar" onclick="toggleCollapse('collapseVias')" style="margin-top:4px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span>📍</span>
-              <span style="font-weight:700; color:#475569;">経由地入力欄一覧</span>
-              <span id="badgeViaCount" class="collapse-summary-badge">0箇所</span>
+            <!-- Via Actions Bar -->
+            <div class="via-actions-row" style="margin: 6px 0 6px 0;">
+              <button id="btnAddVia" class="btn-add-via" onclick="addViaPointInput()" title="クリック連打で複数の経由地を一気に追加できます">
+                <span>➕</span> 経由地を追加 (最大25箇所)
+              </button>
+              <button id="btnClearVias" class="btn-clear-vias" onclick="clearAllVias()" style="display:none;">
+                経由地を全消去
+              </button>
             </div>
-            <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
-              <span id="chevron_collapseVias">▶ 開く</span>
-            </div>
-          </div>
-          <div id="collapseVias" style="display:none; margin-top:6px;">
+
+            <!-- Dynamic Via Points Container (1~25 points) -->
             <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
               <!-- Rendered by JS -->
             </div>
-          </div>
 
-          <!-- Hidden fallback for legacy endPoint input compatibility -->
-          <div id="endPointRow" style="display: none;">
-            <input type="hidden" id="endInput" value="" />
-            <span id="badge_end" class="input-status-badge empty" style="display:none;"></span>
+            <!-- Hidden fallback for legacy endPoint input compatibility -->
+            <div id="endPointRow" style="display: none;">
+              <input type="hidden" id="endInput" value="" />
+              <span id="badge_end" class="input-status-badge empty" style="display:none;"></span>
+            </div>
           </div>
         </div>
 
@@ -2524,16 +2512,19 @@
 
       <!-- Export to Google Maps (最優先表示！ルート計算後は一番上にドーンと表示！) -->
       <div id="exportCard" class="export-box" style="display: none; margin-top: 10px;">
-        <div style="font-size: 0.84rem; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+        <div style="font-size: 0.84rem; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
           <span>📲</span> Googleマップ / ナビ連携
         </div>
-        <p style="font-size: 0.72rem; color: #3b82f6; line-height: 1.35; margin-bottom: 6px;">
-          各区間をGoogleマップアプリへ直接連携して、ズレ0%の正確な車ナビを開始できます。
-        </p>
 
         <!-- Dynamically rendered single or multi-leg container -->
         <div id="gmapsExportContainer">
           <!-- Populated by JS -->
+        </div>
+
+        <div class="export-secondary-row" style="margin-top: 8px;">
+          <button class="btn-gpx" onclick="downloadGpxFile()">
+            <span>💾</span> GPXファイル保存 (全行程一括)
+          </button>
         </div>
       </div>
 
@@ -2552,18 +2543,6 @@
           <div id="planTimeline" class="plan-timeline">
             <!-- Dynamically populated -->
           </div>
-        </div>
-      </div>
-
-        <!-- Dynamically rendered single or multi-leg container -->
-        <div id="gmapsExportContainer">
-          <!-- Rendered by JS -->
-        </div>
-
-        <div class="export-secondary-row" style="margin-top: 6px;">
-          <button class="btn-gpx" onclick="downloadGpxFile()">
-            <span>💾</span> GPXファイル保存 (全行程一括)
-          </button>
         </div>
       </div>
 
@@ -3607,6 +3586,16 @@
       b.textContent = text;
     }
 
+    function updatePointsSummaryBadge() {
+      const b = document.getElementById('badgePointsSummary');
+      if (!b) return;
+      const startText = startPoint && startPoint.lat ? '発: 設定済' : '発: 未設定';
+      const viaCount = viaPoints.length;
+      b.textContent = `${startText} / 経由: ${viaCount}箇所`;
+      b.style.background = (startPoint && startPoint.lat) ? '#dcfce7' : '#e2e8f0';
+      b.style.color = (startPoint && startPoint.lat) ? '#15803d' : '#475569';
+    }
+
     function updateTimeSummaryBadge() {
       const b = document.getElementById('badgeTimeSummary');
       if (!b) return;
@@ -3926,6 +3915,7 @@
       input.value = name;
       input.classList.remove('error');
       updateStatusBadge('start', 'ok');
+      updatePointsSummaryBadge();
 
       if (startMarker) map.removeLayer(startMarker);
 
@@ -3978,6 +3968,7 @@
         input.value = "";
         input.classList.remove('error');
         updateStatusBadge('start', 'empty');
+        updatePointsSummaryBadge();
       } else if (type === 'end') {
         if (endMarker) map.removeLayer(endMarker);
         endMarker = null;
@@ -4105,6 +4096,7 @@
         badgeCount.style.background = viaPoints.length > 0 ? '#ffedd5' : '#e2e8f0';
         badgeCount.style.color = viaPoints.length > 0 ? '#c2410c' : '#475569';
       }
+      updatePointsSummaryBadge();
     }
 
     function moveViaPoint(index, direction) {
@@ -4198,8 +4190,8 @@
       });
 
       // 入力欄に文字入力できるようリストを展開
-      const collapseEl = document.getElementById('collapseVias');
-      const chevron = document.getElementById('chevron_collapseVias');
+      const collapseEl = document.getElementById('collapsePoints');
+      const chevron = document.getElementById('chevron_collapsePoints');
       if (collapseEl) collapseEl.style.display = 'block';
       if (chevron) chevron.textContent = '▼ 閉じる';
 
@@ -6128,22 +6120,27 @@
 
       function renderStopsPinListHtml(stops) {
         return `
-          <div style="margin: 8px 0; font-size: 0.74rem; background: #ffffff; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <div style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 0.7rem;">📍 この区間の通過地点一覧:</div>
-            ${stops.map((s, idx) => {
-              const letter = pinLetters[idx] || `${idx + 1}`;
-              const isGs = s.type === 'gs';
-              const isStart = s.type === 'start';
-              const isEnd = s.type === 'destination' || s.type === 'turnaround';
-              const badgeBg = isGs ? '#ff6b00' : (isStart ? '#10b981' : (isEnd ? '#ef4444' : '#3b82f6'));
-              return `
-                <div style="display:flex; align-items:center; gap:6px; margin: 3px 0;">
-                  <span style="background:${badgeBg}; color:#fff; font-size: 0.65rem; font-weight: 800; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">${letter}</span>
-                  <span style="${isGs ? 'font-weight:bold; color:#d93025;' : (isStart || isEnd ? 'font-weight:600; color:#1e293b;' : 'color:#334155;')}">${escapeXml(s.name)}</span>
-                </div>
-              `;
-            }).join('')}
-          </div>
+          <details style="margin: 6px 0; font-size: 0.74rem; background: #ffffff; border-radius: 6px; border: 1px solid #e2e8f0; overflow:hidden;">
+            <summary style="padding: 5px 8px; font-weight: 600; color: #475569; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; background: #f8fafc;">
+              <span>📍 通過地点・給油所 (${stops.length}地点)</span>
+              <span style="font-size: 0.68rem; color: #64748b; font-weight: normal;">詳細 ▼</span>
+            </summary>
+            <div style="padding: 6px 8px; border-top: 1px solid #f1f5f9;">
+              ${stops.map((s, idx) => {
+                const letter = pinLetters[idx] || `${idx + 1}`;
+                const isGs = s.type === 'gs';
+                const isStart = s.type === 'start';
+                const isEnd = s.type === 'destination' || s.type === 'turnaround';
+                const badgeBg = isGs ? '#ff6b00' : (isStart ? '#10b981' : (isEnd ? '#ef4444' : '#3b82f6'));
+                return `
+                  <div style="display:flex; align-items:center; gap:6px; margin: 3px 0;">
+                    <span style="background:${badgeBg}; color:#fff; font-size: 0.65rem; font-weight: 800; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">${letter}</span>
+                    <span style="${isGs ? 'font-weight:bold; color:#d93025;' : (isStart || isEnd ? 'font-weight:600; color:#1e293b;' : 'color:#334155;')}">${escapeXml(s.name)}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </details>
         `;
       }
 
@@ -6179,21 +6176,7 @@
       } else {
         // 複数区間に分割される場合（2分割、3分割、4分割...）
         let html = `
-          <div class="multi-leg-notice" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; margin-bottom:12px;">
-            <div style="display:flex; align-items:flex-start; gap:8px;">
-              <span style="font-size:1.1rem;">🗺️</span>
-              <div>
-                <div style="font-weight:700; color:#1e40af; font-size:0.8rem; margin-bottom:2px;">
-                  ルート色分け分割ナビ（全地点100%完全再現・ズレ0%！）
-                </div>
-                <div style="font-size:0.72rem; color:#334155; line-height:1.4;">
-                  経由地＋給油所が<strong>合計 ${2 + intermediateStops.length} 地点</strong>あるため、Googleマップの仕様(最大10地点)に合わせて<strong>【第1区間】〜【第${currentLegsData.length}区間】</strong>に自動分割しました。<br>
-                  <strong style="color:#2563eb;">地図上の線の色（青・橙・緑...）と完全に連動</strong>しています。順番にGoogleマップを開いてナビを開始できます。
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="multi-leg-list" style="display:flex; flex-direction:column; gap:12px;">
+          <div class="multi-leg-list" style="display:flex; flex-direction:column; gap:10px;">
         `;
 
         currentLegsData.forEach((leg, idx) => {
@@ -6207,27 +6190,27 @@
           html += `
             <div class="leg-card" style="border: 2px solid ${color.border}; background:${color.bg}; border-radius:8px; padding:10px;"
                  onmouseenter="highlightLegOnMap(${idx})" onmouseleave="resetLegsHighlight()">
-              <div class="leg-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span class="leg-badge" style="background:${color.btnBg}; color:#ffffff; font-weight:700; padding:3px 8px; border-radius:4px; font-size:0.72rem;">
+              <div class="leg-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="leg-badge" style="background:${color.btnBg}; color:#ffffff; font-weight:700; padding:2px 8px; border-radius:4px; font-size:0.72rem;">
                   第${legNum}区間 (${color.name})
                 </span>
                 <span class="leg-stop-count" style="font-size:0.7rem; color:#475569; font-weight:600;">
                   📍 ${allLegStops.length} 地点 / ⛽ ${gsInLeg} 給油所
                 </span>
               </div>
-              <div class="leg-route-title" style="font-weight:700; font-size:0.78rem; color:#1e293b; margin-bottom:6px;">
+              <div class="leg-route-title" style="font-weight:700; font-size:0.78rem; color:#1e293b; margin-bottom:4px;">
                 ${escapeXml(leg.origin.name)} ➜ ${escapeXml(leg.destination.name)}
               </div>
               ${renderStopsPinListHtml(allLegStops)}
-              <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+              <div class="leg-btn-group" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
                 <a class="btn-leg-gmaps" href="${url}" target="_blank" rel="noopener" 
-                   style="flex:1; min-width:200px; background:${color.btnBg}; color:#ffffff; font-weight:700; text-decoration:none; padding:8px 12px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
-                  <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-                  <span>🚗 Googleマップ【第${legNum}区間 (${color.name})】を開く</span>
+                   style="flex:1; min-width:180px; background:${color.btnBg}; color:#ffffff; font-weight:700; text-decoration:none; padding:7px 10px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
+                  <svg viewBox="0 0 24 24" style="width:15px; height:15px; fill:currentColor;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  <span>🚗 Googleマップ【第${legNum}区間】を開く</span>
                 </a>
                 <button class="btn-leg-copy" data-copy-url="${url}" style="padding:6px 10px; font-size:0.72rem; cursor:pointer;">📋 URLコピー</button>
-                <button onclick="highlightLegOnMap(${idx})" style="padding:6px 10px; font-size:0.72rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;" title="地図上のこの区間を拡大表示">🔍 地図で見る</button>
-                <a href="${webUrl}" target="_blank" rel="noopener" style="font-size:0.72rem; color:#475569; text-decoration:underline; display:inline-flex; align-items:center; padding:3px 6px; width:100%; justify-content:center;">
+                <button onclick="highlightLegOnMap(${idx})" style="padding:6px 10px; font-size:0.72rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;" title="地図上のこの区間を拡大表示">🔍 地図</button>
+                <a href="${webUrl}" target="_blank" rel="noopener" style="font-size:0.7rem; color:#64748b; text-decoration:underline; display:inline-flex; align-items:center; padding:2px 4px; width:100%; justify-content:center;">
                   🖥️ Webブラウザ用のピン一覧形式で開く
                 </a>
               </div>
