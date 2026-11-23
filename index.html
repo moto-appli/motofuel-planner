@@ -313,6 +313,33 @@
       color: #c2410c;
     }
 
+    /* Collapsible Sections (省略表示アコーディオン) */
+    .collapse-toggle-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      font-size: 0.74rem;
+    }
+    .collapse-toggle-bar:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+    .collapse-summary-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #475569;
+    }
+
     /* Input Fields for Waypoints */
     .point-input-group {
       display: flex;
@@ -2150,9 +2177,21 @@
             </button>
           </div>
 
-          <!-- Dynamic Via Points Container (1~25 points) -->
-          <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
-            <!-- Rendered by JS -->
+          <!-- Dynamic Via Points Container (デフォルトは省略表示！ピン打ち重視で画面スッキリ) -->
+          <div class="collapse-toggle-bar" onclick="toggleCollapse('collapseVias')" style="margin-top:4px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>📍</span>
+              <span style="font-weight:700; color:#475569;">経由地入力欄一覧</span>
+              <span id="badgeViaCount" class="collapse-summary-badge">0箇所</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
+              <span id="chevron_collapseVias">▶ 開く</span>
+            </div>
+          </div>
+          <div id="collapseVias" style="display:none; margin-top:6px;">
+            <div id="viaPointsContainer" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Rendered by JS -->
+            </div>
           </div>
 
           <!-- Hidden fallback for legacy endPoint input compatibility -->
@@ -2162,8 +2201,18 @@
           </div>
         </div>
 
-        <!-- Highway & Toll Road Toggle -->
-        <div style="margin-top: 10px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
+        <!-- Highway & Avoid Same Road Settings (まとめて省略表示) -->
+        <div class="collapse-toggle-bar" onclick="toggleCollapse('collapseRoadSettings')" style="margin-top: 8px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>🛣️</span>
+            <span style="font-weight:700; color:#475569;">道路・周回設定</span>
+            <span id="badgeRoadSettings" class="collapse-summary-badge">下道優先</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
+            <span id="chevron_collapseRoadSettings">▶ 開く</span>
+          </div>
+        </div>
+        <div id="collapseRoadSettings" style="display:none; margin-top:6px; background:var(--gray-50); padding:8px 10px; border-radius:8px; border:1px solid var(--gray-200);">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <label for="selectHighwayMode" style="font-size: 0.72rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 4px;">
               <span>🛣️</span> 高速・有料道路
@@ -2176,11 +2225,8 @@
           <div style="font-size: 0.65rem; color: var(--gray-600); margin-top: 3px; line-height: 1.3;">
             ※ デフォルトは「下道優先」です。Googleマップ連携時も有料道路回避でナビ開始します（原付二種・下道ツーリング向け）
           </div>
-        </div>
 
-        <!-- Avoid Same Road (Loop / Circuit Priority) Toggle -->
-        <div style="margin-top: 8px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
             <label for="checkAvoidSameRoad" style="font-size: 0.74rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 5px; cursor: pointer;">
               <span>🔄</span> 同じ道を通らない (周回・ループ優先)
             </label>
@@ -2197,214 +2243,216 @@
         </div>
       </div>
 
-      <!-- Time Settings (Departure or Arrival Time) -->
-      <div class="card" id="cardTimeSettings">
-        <div class="card-title">
-          <div class="icon-wrap">
+      <!-- Time Settings (Departure or Arrival Time) - 省略表示アコーディオン -->
+      <div class="card" id="cardTimeSettings" style="margin-bottom: 8px; padding: 10px 12px;">
+        <div class="collapse-toggle-bar" onclick="toggleCollapse('collapseTimeSettings')" style="background:transparent; padding:0; border:none;">
+          <div style="display:flex; align-items:center; gap:6px;">
             <span>🕒</span>
-            <span>ツーリング時刻 ＆ 営業時間判定</span>
+            <span style="font-weight:700; color:#374151; font-size:0.78rem;">ツーリング時刻 ＆ 休憩設定</span>
+            <span id="badgeTimeSummary" class="collapse-summary-badge">出発 07:00</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
+            <span id="chevron_collapseTimeSettings">▶ 開く</span>
           </div>
         </div>
 
-        <div class="time-settings-box">
-          <div class="time-mode-selector">
-            <label>
-              <input type="radio" name="timeType" value="departure" checked onchange="onTimeTypeChange()" />
-              <span>出発時刻を指定</span>
-            </label>
-            <label>
-              <input type="radio" name="timeType" value="arrival" onchange="onTimeTypeChange()" />
-              <span>帰着希望時刻を指定</span>
-            </label>
-          </div>
-
-          <div class="time-inputs-row">
-            <div class="time-picker-wrap">
-              <span style="font-size: 0.72rem; color: var(--gray-600); margin-right: 6px;" id="timeLabel">出発:</span>
-              <input type="time" id="timeInput" value="07:00" onchange="onTimeInputChange()" />
-            </div>
-            <div style="font-size: 0.72rem; color: var(--gray-600);">
-              ※通過予定時刻でスタンド営業判定
-            </div>
-          </div>
-
-          <div class="break-time-option">
-            <input type="checkbox" id="checkBreakTime" checked onchange="onBreakTimeToggle()" />
-            <label for="checkBreakTime">ツーリング休憩を考慮 (1.5時間ごとに15分休憩を加算)</label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Motorcycle Specs & Fuel Settings -->
-      <div class="card" id="cardBikeSpecs">
-        <div class="card-title">
-          <div class="icon-wrap">
-            <span>⛽</span>
-            <span>バイク仕様 ＆ 航続距離設定</span>
-          </div>
-        </div>
-
-        <!-- Bike Preset Selector -->
-        <div style="margin-bottom: 10px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <label for="bikePresetSelect" style="font-size: 0.72rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 4px;">
-              <span>🏍️</span> 車種プリセット
-            </label>
-            <div style="display: flex; gap: 4px;">
-              <button type="button" onclick="saveCurrentBikePreset()" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 7px; font-size: 0.68rem; color: var(--secondary); cursor: pointer; font-weight: 600;">
-                💾 マイバイク保存
-              </button>
-              <button type="button" id="btnDeleteCustomPreset" onclick="deleteCurrentCustomPreset()" style="display: none; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 4px; padding: 2px 5px; font-size: 0.68rem; color: var(--danger); cursor: pointer; font-weight: 600;">
-                🗑️ 削除
-              </button>
-            </div>
-          </div>
-          <select id="bikePresetSelect" class="filter-select" onchange="onBikePresetChange()" style="width: 100%; font-size: 0.78rem;">
-            <option value="custom">直接入力 / カスタム設定</option>
-            <optgroup label="📋 代表的なバイク種別">
-              <option value="p_250_sport" data-tank="14" data-km="26">250cc スポーツ・ネイキッド (14L / 26km/L)</option>
-              <option value="p_400_std" data-tank="15" data-km="24">400cc スタンダード・GB350 (15L / 24km/L)</option>
-              <option value="p_heavy_tourer" data-tank="17" data-km="18">大型ツアラー・リッターネイキッド (17L / 18km/L)</option>
-              <option value="p_adv" data-tank="22" data-km="19">大型アドベンチャー (22L / 19km/L)</option>
-              <option value="p_cruiser" data-tank="11" data-km="28">クルーザー・レブル系 (11L / 28km/L)</option>
-              <option value="p_125_tourer" data-tank="7.5" data-km="45">原付二種 125cc・ハンターカブ (7.5L / 45km/L)</option>
-              <option value="p_cub" data-tank="4.3" data-km="55">カブ系・スモール (4.3L / 55km/L)</option>
-            </optgroup>
-            <optgroup label="⭐ マイバイク (保存済み)" id="myBikeOptGroup">
-              <!-- Dynamically populated from localStorage -->
-            </optgroup>
-          </select>
-        </div>
-
-        <div class="specs-grid">
-          <div class="spec-item">
-            <span class="spec-label">タンク容量</span>
-            <div class="spec-input-wrap">
-              <input type="number" id="tankCapacity" value="14.0" step="0.5" min="3" max="40" oninput="updateFuelCalculations()" />
-              <span class="spec-unit">L</span>
-            </div>
-          </div>
-          <div class="spec-item">
-            <span class="spec-label">実燃費</span>
-            <div class="spec-input-wrap">
-              <input type="number" id="fuelEconomy" value="22.0" step="0.5" min="5" max="80" oninput="updateFuelCalculations()" />
-              <span class="spec-unit">km/L</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Safety Margin Slider -->
-        <div class="slider-box">
-          <div class="slider-header">
-            <span class="spec-label">安全率しきい値 (給油推奨ライン)</span>
-            <span class="slider-val-badge" id="safetyMarginBadge">80 %</span>
-          </div>
-          <input type="range" id="safetyMarginRange" min="50" max="95" step="5" value="80" oninput="onSafetyMarginChange()" />
-          <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--gray-600); margin-top: 2px;">
-            <span>50% (超早め給油)</span>
-            <span>80% (標準目安)</span>
-            <span>95% (ギリギリ)</span>
-          </div>
-        </div>
-
-        <!-- Calculated Stats -->
-        <div class="fuel-calc-summary">
-          <div class="calc-stat-item">
-            <div class="val" id="valMaxRange">308 km</div>
-            <div class="lbl">理論最大航続距離</div>
-          </div>
-          <div class="calc-stat-item highlight">
-            <div class="val" id="valSafeTarget">246 km</div>
-            <div class="lbl">給油目標インターバル</div>
-          </div>
-          <div class="calc-stat-item">
-            <div class="val" id="valReserveRange">62 km</div>
-            <div class="lbl">残量マージン</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Gas Station Filter Card -->
-      <div class="card" id="cardGsFilter">
-        <div class="card-title">
-          <div class="icon-wrap">
-            <span>🏪</span>
-            <span>給油スタンド条件 (ブランド・セルフ)</span>
-          </div>
-        </div>
-        <div class="filter-grid">
-          <div class="filter-item">
-            <label class="filter-label" for="filterGsBrand">希望ブランド</label>
-            <select id="filterGsBrand" class="filter-select" onchange="onGsFilterChange()">
-              <option value="all">指定なし (全ブランド)</option>
-              <option value="eneos">ENEOS (エネオス / EneKey)</option>
-              <option value="idemitsu">出光 / apollostation (DrivePay)</option>
-              <option value="cosmo">コスモ石油</option>
-              <option value="kygnus">キグナス石油</option>
-              <option value="major">大手3系列 (ENEOS/出光/コスモ)</option>
-            </select>
-          </div>
-          <div class="filter-item">
-            <label class="filter-label" for="filterGsService">給油方式</label>
-            <select id="filterGsService" class="filter-select" onchange="onGsFilterChange()">
-              <option value="all">指定なし (セルフ・フル)</option>
-              <option value="self">セルフ給油限定 (Self)</option>
-              <option value="full">フルサービス限定</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 給油アルゴリズム詳細設定 (裏データ・エキスパートチューニング) -->
-        <div style="margin-top: 10px; border-top: 1px dashed var(--gray-300); padding-top: 8px;">
-          <button type="button" id="btnToggleAdvancedGsSettings" onclick="toggleAdvancedGsSettings()" style="background: none; border: none; padding: 2px 0; font-size: 0.73rem; font-weight: 700; color: #ea580c; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <span style="display: flex; align-items: center; gap: 5px;">
-              <span>⚙️</span>
-              <span>給油アルゴリズム詳細設定 (探索半径・手前給油)</span>
-            </span>
-            <span id="advancedGsChevron" style="font-size: 0.65rem; transition: transform 0.2s; color: #64748b;">▼</span>
-          </button>
-
-          <div id="advancedGsSettingsBox" style="display: none; margin-top: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px;">
-            <div style="margin-bottom: 8px;">
-              <label class="filter-label" for="settingGsRadius" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>① スタンド探索許容半径</span>
-                <span style="font-size: 0.65rem; color: #64748b;">(直線探索レンジ)</span>
+        <div id="collapseTimeSettings" style="display:none; margin-top:10px;">
+          <div class="time-settings-box">
+            <div class="time-mode-selector">
+              <label>
+                <input type="radio" name="timeType" value="departure" checked onchange="onTimeTypeChange()" />
+                <span>出発時刻を指定</span>
               </label>
-              <select id="settingGsRadius" class="filter-select" onchange="onAdvancedGsSettingChange()" style="font-size: 0.74rem; padding: 5px 8px; border-color: #cbd5e1;">
-                <option value="3000">3 km (ルート直近・最小寄り道)</option>
-                <option value="5000">5 km (標準バランス)</option>
-                <option value="10000" selected>10 km (広域・山間部向け / プリセット初期値)</option>
-                <option value="15000">15 km (超広域・過疎地・深夜)</option>
-              </select>
-            </div>
-
-            <div style="margin-bottom: 8px;">
-              <label class="filter-label" for="settingGsTimingStrategy" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>② 給油タイミング戦略</span>
-                <span style="font-size: 0.65rem; color: #16a34a; font-weight: 700;">(推奨プリセット適用中)</span>
+              <label>
+                <input type="radio" name="timeType" value="arrival" onchange="onTimeTypeChange()" />
+                <span>帰着希望時刻を指定</span>
               </label>
-              <select id="settingGsTimingStrategy" class="filter-select" onchange="onAdvancedGsSettingChange()" style="font-size: 0.74rem; padding: 5px 8px; border-color: #cbd5e1;">
-                <option value="early_smart" selected>早めの給油推奨 (峠・半島手前の市街地で安全確保 / プリセット)</option>
-                <option value="exact">規定距離ぴったり (計算インターバル通りに探索)</option>
-                <option value="stretch">限界まで粘る (航続距離最優先・給油回数削減)</option>
-              </select>
             </div>
 
-            <div id="boxEarlyMarginKm" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: #475569;">
-              <span>手前給油マージン:</span>
-              <div style="display: flex; align-items: center; gap: 4px;">
-                <input type="number" id="settingGsEarlyKm" value="20" min="5" max="50" step="5" onchange="onAdvancedGsSettingChange()" style="width: 52px; font-size: 0.75rem; padding: 2px 4px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;" />
-                <span style="font-size: 0.7rem; color: #475569;">km手前</span>
+            <div class="time-inputs-row">
+              <div class="time-picker-wrap">
+                <span style="font-size: 0.72rem; color: var(--gray-600); margin-right: 6px;" id="timeLabel">出発:</span>
+                <input type="time" id="timeInput" value="07:00" onchange="onTimeInputChange()" />
+              </div>
+              <div style="font-size: 0.72rem; color: var(--gray-600);">
+                ※通過予定時刻でスタンド営業判定
               </div>
             </div>
-            <div style="font-size: 0.65rem; color: #64748b; margin-top: 5px; line-height: 1.35;">
-              ※「早めの給油推奨」時は、山奥や半島の先端などGS空白地帯に入る手前の市街地・幹線道路沿いで余裕を持ってスタンドを確保します。
+
+            <div class="break-time-option">
+              <input type="checkbox" id="checkBreakTime" checked onchange="onBreakTimeToggle()" />
+              <label for="checkBreakTime">ツーリング休憩を考慮 (1.5時間ごとに15分休憩を加算)</label>
             </div>
           </div>
         </div>
+      </div>
 
-        <div style="font-size: 0.68rem; color: var(--gray-600); margin-top: 6px; line-height: 1.35;">
-          ※ツーリング先・山間部で条件に一致するGSがない場合は、安全のため近隣の営業中GSを自動案内します。
+      <!-- Motorcycle Specs & Fuel Settings (タンク容量と給油条件をまとめて省略表示) -->
+      <div class="card" id="cardBikeSpecs" style="margin-bottom: 8px; padding: 10px 12px;">
+        <div class="collapse-toggle-bar" onclick="toggleCollapse('collapseBikeFuel')" style="background:transparent; padding:0; border:none;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>⛽</span>
+            <span style="font-weight:700; color:#374151; font-size:0.78rem;">バイク仕様 ＆ 給油スタンド条件</span>
+            <span id="badgeBikeSummary" class="collapse-summary-badge" style="color:#2563eb; background:#eff6ff;">14L / 22km/L</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
+            <span id="chevron_collapseBikeFuel">▶ 開く</span>
+          </div>
+        </div>
+
+        <div id="collapseBikeFuel" style="display:none; margin-top:10px;">
+          <!-- Bike Preset Selector -->
+          <div style="margin-bottom: 10px; background: var(--gray-50); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gray-200);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label for="bikePresetSelect" style="font-size: 0.72rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 4px;">
+                <span>🏍️</span> 車種プリセット
+              </label>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" onclick="saveCurrentBikePreset()" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 7px; font-size: 0.68rem; color: var(--secondary); cursor: pointer; font-weight: 600;">
+                  💾 マイバイク保存
+                </button>
+                <button type="button" id="btnDeleteCustomPreset" onclick="deleteCurrentCustomPreset()" style="display: none; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 4px; padding: 2px 5px; font-size: 0.68rem; color: var(--danger); cursor: pointer; font-weight: 600;">
+                  🗑️ 削除
+                </button>
+              </div>
+            </div>
+            <select id="bikePresetSelect" class="filter-select" onchange="onBikePresetChange()" style="width: 100%; font-size: 0.78rem;">
+              <option value="custom">直接入力 / カスタム設定</option>
+              <optgroup label="📋 代表的なバイク種別">
+                <option value="p_250_sport" data-tank="14" data-km="26">250cc スポーツ・ネイキッド (14L / 26km/L)</option>
+                <option value="p_400_std" data-tank="15" data-km="24">400cc スタンダード・GB350 (15L / 24km/L)</option>
+                <option value="p_heavy_tourer" data-tank="17" data-km="18">大型ツアラー・リッターネイキッド (17L / 18km/L)</option>
+                <option value="p_adv" data-tank="22" data-km="19">大型アドベンチャー (22L / 19km/L)</option>
+                <option value="p_cruiser" data-tank="11" data-km="28">クルーザー・レブル系 (11L / 28km/L)</option>
+                <option value="p_125_tourer" data-tank="7.5" data-km="45">原付二種 125cc・ハンターカブ (7.5L / 45km/L)</option>
+                <option value="p_cub" data-tank="4.3" data-km="55">カブ系・スモール (4.3L / 55km/L)</option>
+              </optgroup>
+              <optgroup label="⭐ マイバイク (保存済み)" id="myBikeOptGroup">
+                <!-- Dynamically populated from localStorage -->
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="specs-grid">
+            <div class="spec-item">
+              <span class="spec-label">タンク容量</span>
+              <div class="spec-input-wrap">
+                <input type="number" id="tankCapacity" value="14.0" step="0.5" min="3" max="40" oninput="updateFuelCalculations()" />
+                <span class="spec-unit">L</span>
+              </div>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">実燃費</span>
+              <div class="spec-input-wrap">
+                <input type="number" id="fuelEconomy" value="22.0" step="0.5" min="5" max="80" oninput="updateFuelCalculations()" />
+                <span class="spec-unit">km/L</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Safety Margin Slider -->
+          <div class="slider-box">
+            <div class="slider-header">
+              <span class="spec-label">安全率しきい値 (給油推奨ライン)</span>
+              <span class="slider-val-badge" id="safetyMarginBadge">80 %</span>
+            </div>
+            <input type="range" id="safetyMarginRange" min="50" max="95" step="5" value="80" oninput="onSafetyMarginChange()" />
+            <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--gray-600); margin-top: 2px;">
+              <span>50% (超早め給油)</span>
+              <span>80% (標準目安)</span>
+              <span>95% (ギリギリ)</span>
+            </div>
+          </div>
+
+          <!-- Calculated Stats -->
+          <div class="fuel-calc-summary">
+            <div class="calc-stat-item">
+              <div class="val" id="valMaxRange">308 km</div>
+              <div class="lbl">理論最大航続距離</div>
+            </div>
+            <div class="calc-stat-item highlight">
+              <div class="val" id="valSafeTarget">246 km</div>
+              <div class="lbl">給油目標インターバル</div>
+            </div>
+            <div class="calc-stat-item">
+              <div class="val" id="valReserveRange">62 km</div>
+              <div class="lbl">残量マージン</div>
+            </div>
+          </div>
+
+          <!-- Gas Station Filter Block -->
+          <div id="cardGsFilter" style="margin-top: 10px; border-top: 1px dashed var(--gray-300); padding-top: 8px;">
+            <div style="font-weight: 700; color: #374151; font-size: 0.74rem; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+              <span>🏪</span> スタンド条件 (ブランド・セルフ)
+            </div>
+            <div class="filter-grid">
+              <div class="filter-item">
+                <label class="filter-label" for="filterGsBrand">希望ブランド</label>
+                <select id="filterGsBrand" class="filter-select" onchange="onGsFilterChange()">
+                  <option value="all">指定なし (全ブランド)</option>
+                  <option value="eneos">ENEOS (エネオス / EneKey)</option>
+                  <option value="idemitsu">出光 / apollostation (DrivePay)</option>
+                  <option value="cosmo">コスモ石油</option>
+                  <option value="kygnus">キグナス石油</option>
+                  <option value="major">大手3系列 (ENEOS/出光/コスモ)</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="filter-label" for="filterGsService">給油方式</label>
+                <select id="filterGsService" class="filter-select" onchange="onGsFilterChange()">
+                  <option value="all">指定なし (セルフ・フル)</option>
+                  <option value="self">セルフ給油限定 (Self)</option>
+                  <option value="full">フルサービス限定</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 給油アルゴリズム詳細設定 (裏データ・エキスパートチューニング) -->
+            <div style="margin-top: 8px; border-top: 1px dashed var(--gray-200); padding-top: 6px;">
+              <button type="button" id="btnToggleAdvancedGsSettings" onclick="toggleAdvancedGsSettings()" style="background: none; border: none; padding: 2px 0; font-size: 0.72rem; font-weight: 700; color: #ea580c; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <span style="display: flex; align-items: center; gap: 4px;">
+                  <span>⚙️</span>
+                  <span>探索半径・手前給油チューニング</span>
+                </span>
+                <span id="advancedGsChevron" style="font-size: 0.65rem; transition: transform 0.2s; color: #64748b;">▼</span>
+              </button>
+
+              <div id="advancedGsSettingsBox" style="display: none; margin-top: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+                <div style="margin-bottom: 6px;">
+                  <label class="filter-label" for="settingGsRadius" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>① スタンド探索許容半径</span>
+                    <span style="font-size: 0.65rem; color: #64748b;">(直線探索レンジ)</span>
+                  </label>
+                  <select id="settingGsRadius" class="filter-select" onchange="onAdvancedGsSettingChange()" style="font-size: 0.74rem; padding: 4px 6px; border-color: #cbd5e1;">
+                    <option value="3000">3 km (ルート直近・最小寄り道)</option>
+                    <option value="5000">5 km (標準バランス)</option>
+                    <option value="10000" selected>10 km (広域・山間部向け / プリセット初期値)</option>
+                    <option value="15000">15 km (超広域・過疎地・深夜)</option>
+                  </select>
+                </div>
+
+                <div style="margin-bottom: 6px;">
+                  <label class="filter-label" for="settingGsTimingStrategy" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>② 給油タイミング戦略</span>
+                    <span style="font-size: 0.65rem; color: #16a34a; font-weight: 700;">(推奨プリセット)</span>
+                  </label>
+                  <select id="settingGsTimingStrategy" class="filter-select" onchange="onAdvancedGsSettingChange()" style="font-size: 0.74rem; padding: 4px 6px; border-color: #cbd5e1;">
+                    <option value="early_smart" selected>早めの給油推奨 (峠・半島手前の市街地で安全確保)</option>
+                    <option value="exact">規定距離ぴったり (計算インターバル通り)</option>
+                    <option value="stretch">限界まで粘る (航続距離最優先)</option>
+                  </select>
+                </div>
+
+                <div id="boxEarlyMarginKm" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: #475569;">
+                  <span>手前給油マージン:</span>
+                  <div style="display: flex; align-items: center; gap: 4px;">
+                    <input type="number" id="settingGsEarlyKm" value="20" min="5" max="50" step="5" onchange="onAdvancedGsSettingChange()" style="width: 52px; font-size: 0.75rem; padding: 2px 4px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;" />
+                    <span style="font-size: 0.7rem; color: #475569;">km手前</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2474,47 +2522,38 @@
         </div>
       </div>
 
-      <!-- Gas Station Plan Section -->
-      <div id="planSection" class="plan-section" style="display: none;">
-        <div class="card-title" style="margin-bottom: 2px;">
-          <div class="icon-wrap">
-            <span>🏁</span>
-            <span>給油＆タイムスケジュール</span>
-          </div>
+      <!-- Export to Google Maps (最優先表示！ルート計算後は一番上にドーンと表示！) -->
+      <div id="exportCard" class="export-box" style="display: none; margin-top: 10px;">
+        <div style="font-size: 0.84rem; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span>📲</span> Googleマップ / ナビ連携
         </div>
-        <div id="planTimeline" class="plan-timeline">
-          <!-- Dynamically populated -->
+        <p style="font-size: 0.72rem; color: #3b82f6; line-height: 1.35; margin-bottom: 6px;">
+          各区間をGoogleマップアプリへ直接連携して、ズレ0%の正確な車ナビを開始できます。
+        </p>
+
+        <!-- Dynamically rendered single or multi-leg container -->
+        <div id="gmapsExportContainer">
+          <!-- Populated by JS -->
         </div>
       </div>
 
-      <!-- Export to Google Maps -->
-      <div id="exportCard" class="export-box" style="display: none;">
-        <div style="font-size: 0.82rem; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 4px;">
-          <span>📲</span> Googleマップ / ナビ連携
-        </div>
-        <p style="font-size: 0.72rem; color: #3b82f6; line-height: 1.35; margin-bottom: 2px;">
-          給油スタンドおよび経由地を実際の走行順に組み込んだGoogleマップURLです。スマホで開くと直接Googleマップアプリでナビ開始できます。
-        </p>
-
-        <!-- Google Maps Waypoint Export Mode (Exact Coordinates vs Place Search) -->
-        <div style="background: #ffffff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 10px; margin: 6px 0; font-size: 0.72rem;">
-          <div style="font-weight: 700; color: #1e40af; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-            <span>📍 Googleマップへの経由地渡し方:</span>
+      <!-- Gas Station Plan Section (下部に配置＆デフォルト省略表示！) -->
+      <div id="planSection" class="card" style="display: none; padding: 10px 12px; margin-top: 10px;">
+        <div class="collapse-toggle-bar" onclick="toggleCollapse('collapsePlanTimeline')" style="background:transparent; padding:0; border:none;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>🏁</span>
+            <span style="font-weight:700; color:#374151; font-size:0.78rem;">給油＆タイムスケジュール詳細</span>
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1e293b; font-weight: 600;">
-              <input type="radio" name="gmapsWaypointMode" value="exact_coords" checked onchange="onGmapsWaypointModeChange()">
-              <span>正確な位置（座標・ズレ0% / 推奨）</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: #475569;">
-              <input type="radio" name="gmapsWaypointMode" value="place_name" onchange="onGmapsWaypointModeChange()">
-              <span>店名表示優先（Google検索）</span>
-            </label>
-          </div>
-          <div style="font-size: 0.65rem; color: #64748b; margin-top: 3px; line-height: 1.3;">
-            ※「正確な位置」を選ぶと、アプリの地図と1ミリもズレずにGoogleマップで正確なナビ走行ができます。
+          <div style="display:flex; align-items:center; gap:4px; color:#64748b; font-size:0.72rem;">
+            <span id="chevron_collapsePlanTimeline">▶ 開く</span>
           </div>
         </div>
+        <div id="collapsePlanTimeline" style="display:none; margin-top:10px;">
+          <div id="planTimeline" class="plan-timeline">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
 
         <!-- Dynamically rendered single or multi-leg container -->
         <div id="gmapsExportContainer">
@@ -2732,6 +2771,8 @@
       renderViaInputs();
       renderBikePresetOptions();
       updateFuelCalculations();
+      updateRoadSettingsBadge();
+      updateTimeSummaryBadge();
       restoreAdvancedGsSettings();
       restoreGmapsWaypointMode();
       renderSavedRoutesList();
@@ -3541,6 +3582,39 @@
       showToast(enabled ? "⛽ 給油計画モードを有効にしました" : "🛣️ 給油なし（ルートのみ作成）に切り替えました");
     }
 
+    // ==========================================
+    // Accordion / Collapsible UI Helpers
+    // ==========================================
+    function toggleCollapse(elementId) {
+      const el = document.getElementById(elementId);
+      const chevron = document.getElementById(`chevron_${elementId}`);
+      if (!el) return;
+      const isHidden = (el.style.display === 'none' || getComputedStyle(el).display === 'none');
+      el.style.display = isHidden ? 'block' : 'none';
+      if (chevron) {
+        chevron.textContent = isHidden ? '▼ 閉じる' : '▶ 開く';
+      }
+    }
+
+    function updateRoadSettingsBadge() {
+      const b = document.getElementById('badgeRoadSettings');
+      if (!b) return;
+      const isAvoidHw = highwayAvoidMode === 'avoid';
+      let text = isAvoidHw ? '下道優先' : '高速利用';
+      if (isAvoidSameRoadEnabled) {
+        text += ' / ループ優先';
+      }
+      b.textContent = text;
+    }
+
+    function updateTimeSummaryBadge() {
+      const b = document.getElementById('badgeTimeSummary');
+      if (!b) return;
+      const timeType = document.querySelector('input[name="timeType"]:checked')?.value || 'departure';
+      const timeVal = document.getElementById('timeInput')?.value || '07:00';
+      b.textContent = `${timeType === 'departure' ? '出発' : '帰着'} ${timeVal}`;
+    }
+
     function setInputMode(mode) {
       currentInputMode = mode;
       document.getElementById('btnModeText')?.classList.toggle('active', mode === 'text');
@@ -3608,6 +3682,7 @@
     function onHighwayModeChange() {
       const sel = document.getElementById('selectHighwayMode');
       highwayAvoidMode = sel ? sel.value : 'avoid';
+      updateRoadSettingsBadge();
 
       if (currentRouteData) {
         calculateRouteAndFuelPlan();
@@ -3619,6 +3694,7 @@
     function onAvoidSameRoadChange() {
       const chk = document.getElementById('checkAvoidSameRoad');
       isAvoidSameRoadEnabled = chk ? chk.checked : false;
+      updateRoadSettingsBadge();
 
       if (currentRouteData) {
         calculateRouteAndFuelPlan();
@@ -4022,6 +4098,13 @@
       btnAdd.style.display = viaPoints.length >= MAX_VIA_POINTS ? 'none' : 'inline-flex';
       btnAdd.innerHTML = `<span>➕</span> 経由地を追加 (最大${MAX_VIA_POINTS}箇所) <span style="font-size:0.65rem; color:#64748b; margin-left:3px;">[${viaPoints.length}/${MAX_VIA_POINTS}]</span>`;
       btnClearVias.style.display = viaPoints.length > 0 ? 'inline-block' : 'none';
+
+      const badgeCount = document.getElementById('badgeViaCount');
+      if (badgeCount) {
+        badgeCount.textContent = `${viaPoints.length}箇所`;
+        badgeCount.style.background = viaPoints.length > 0 ? '#ffedd5' : '#e2e8f0';
+        badgeCount.style.color = viaPoints.length > 0 ? '#c2410c' : '#475569';
+      }
     }
 
     function moveViaPoint(index, direction) {
@@ -4113,6 +4196,13 @@
         name: "",
         marker: null
       });
+
+      // 入力欄に文字入力できるようリストを展開
+      const collapseEl = document.getElementById('collapseVias');
+      const chevron = document.getElementById('chevron_collapseVias');
+      if (collapseEl) collapseEl.style.display = 'block';
+      if (chevron) chevron.textContent = '▼ 閉じる';
+
       renderViaInputs();
       const input = document.getElementById(`viaInput_${newId}`);
       if (input) {
@@ -4673,6 +4763,11 @@
       document.getElementById('valReserveRange').textContent = `${reserve} km`;
       document.getElementById('safetyMarginBadge').textContent = `${marginPct} %`;
 
+      const badgeBike = document.getElementById('badgeBikeSummary');
+      if (badgeBike) {
+        badgeBike.textContent = `${tank}L / ${kmPerL}km/L`;
+      }
+
       return { maxRange, safeTarget, reserve, marginPct };
     }
 
@@ -4686,12 +4781,14 @@
     function onTimeTypeChange() {
       const isDep = document.querySelector('input[name="timeType"]:checked').value === 'departure';
       document.getElementById('timeLabel').textContent = isDep ? "出発:" : "帰着:";
+      updateTimeSummaryBadge();
       if (currentRouteData) {
         generateFuelPlanFromRoute(currentRouteData);
       }
     }
 
     function onTimeInputChange() {
+      updateTimeSummaryBadge();
       if (currentRouteData) {
         generateFuelPlanFromRoute(currentRouteData);
       }
