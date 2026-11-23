@@ -1282,21 +1282,28 @@
     .pin-mode-banner {
       position: absolute;
       top: 12px;
-      left: 12px;
+      left: 175px;
       right: 12px;
-      z-index: 1000;
+      z-index: 2500;
       background: #1e293b;
       color: #ffffff;
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 10px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       display: none;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
       animation: modalFadeIn 0.2s ease-out;
+    }
+    @media (max-width: 600px) {
+      .pin-mode-banner {
+        top: 52px;
+        left: 12px;
+        right: 12px;
+      }
     }
     .pin-mode-banner.active {
       display: flex;
@@ -3661,11 +3668,13 @@
       }
     }
 
-    function cancelPinDropMode() {
+    function cancelPinDropMode(silent = false) {
       activeFocusTarget = null;
       document.getElementById('pinModeBanner')?.classList.remove('active');
       document.getElementById('focusTipBar')?.style.setProperty('display', 'none');
-      showToast("ピン設置モードを解除しました");
+      if (!silent) {
+        showToast("ピン設置モードを解除しました");
+      }
     }
 
     function onHighwayModeChange() {
@@ -3862,6 +3871,8 @@
       if (currentRouteData) {
         if (isRouteEditModeActive) {
           handleTapInsertVia(e.latlng.lat, e.latlng.lng);
+        } else {
+          showToast("💡 ルート描画中です。経由地を追加するには右上の「📍 経由地を割り込み追加」を押してください");
         }
         return; // 修正モードがOFFなら何もしない
       }
@@ -4536,41 +4547,70 @@
     }
 
     function resetAllPointsAndRoute() {
+      cancelPinDropMode(true);
       clearPoint('start');
       clearPoint('end');
       clearAllVias();
-      clearRouteOverlays();
+      clearRouteVisualsOnly();
+      currentRouteData = null;
       savePinHistory();
       map.setView([35.6812, 138.8], 8);
       showToast("すべてのピンとルートをリセットしました 🗑️");
     }
 
     function clearRouteVisualsOnly(preserveEditMode = false) {
-      if (isRouteEditModeActive && !preserveEditMode) {
-        toggleRouteEditMode(false);
+      if (!preserveEditMode) {
+        currentRouteData = null; // 【最重要！】ルートデータを確実にnullにリセット！これでタップでのピン立てが即座に可能になる！
+        isRouteEditModeActive = false; // 修正モードも即座に強制OFF（非同期の再計算を走らせない！）
+
+        const banner = document.getElementById('routeEditModeBanner');
+        if (banner) banner.classList.remove('active');
+        const sidebarBtn = document.getElementById('btnRouteEditSidebar');
+        if (sidebarBtn) {
+          sidebarBtn.classList.remove('active');
+          sidebarBtn.innerHTML = `<span>📍</span> <span>地図タップで経由地を割り込み追加</span>`;
+          sidebarBtn.style.background = '#fff7ed';
+          sidebarBtn.style.borderColor = '#ea580c';
+          sidebarBtn.style.color = '#c2410c';
+        }
+        if (map && map.getContainer()) map.getContainer().style.cursor = '';
       }
+
       const btnEdit = document.getElementById('btnRouteEditMode');
       if (btnEdit && !preserveEditMode) btnEdit.style.display = 'none';
 
       if (routePolyline && !preserveEditMode) {
-        map.removeLayer(routePolyline);
+        try { map.removeLayer(routePolyline); } catch (e) {}
         routePolyline = null;
       }
       routePolylines.forEach(p => {
-        if (p && map.hasLayer(p)) map.removeLayer(p);
+        try { if (p && map.hasLayer(p)) map.removeLayer(p); } catch (e) {}
       });
       routePolylines = [];
       currentLegsData = [];
 
-      fuelMilestoneMarkers.forEach(m => map.removeLayer(m));
+      // 万が一地図上に残ったルートポリライン（分割ポリライン含む）を完全に一掃する安全ネット
+      if (!preserveEditMode && map) {
+        map.eachLayer(layer => {
+          if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+            try { map.removeLayer(layer); } catch (e) {}
+          }
+        });
+      }
+
+      fuelMilestoneMarkers.forEach(m => { try { map.removeLayer(m); } catch (e) {} });
       fuelMilestoneMarkers = [];
-      gasStationMarkers.forEach(m => map.removeLayer(m));
+      gasStationMarkers.forEach(m => { try { map.removeLayer(m); } catch (e) {} });
       gasStationMarkers = [];
       plannedStops = [];
+
       if (!preserveEditMode) {
-        document.getElementById('routeOverviewCard').style.display = 'none';
-        document.getElementById('planSection').style.display = 'none';
-        document.getElementById('exportCard').style.display = 'none';
+        const overview = document.getElementById('routeOverviewCard');
+        if (overview) overview.style.display = 'none';
+        const plan = document.getElementById('planSection');
+        if (plan) plan.style.display = 'none';
+        const exportCard = document.getElementById('exportCard');
+        if (exportCard) exportCard.style.display = 'none';
       }
     }
 
